@@ -1,26 +1,133 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --peach: #ffd9c2;
+  --peach-light: #fff5f0;
+  --red: #cc0000;
+  --red-dark: #7c0000;
+  --red-muted: rgba(204, 0, 0, 0.08);
+  --text: #1a0a0a;
+  --text-muted: #5c3d3d;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-peach: var(--peach);
+  --color-peach-light: var(--peach-light);
+  --color-red: var(--red);
+  --color-red-dark: var(--red-dark);
+  --color-red-muted: var(--red-muted);
+  --color-text: var(--text);
+  --color-text-muted: var(--text-muted);
+  --font-sans: var(--font-dm-sans);
+  --font-display: var(--font-instrument);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  scroll-behavior: smooth;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--peach-light);
+  color: var(--text);
+  font-family: var(--font-dm-sans), system-ui, sans-serif;
+}
+
+::selection {
+  background: var(--red);
+  color: white;
+}
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes pulse-dot {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.6;
+    transform: scale(1.15);
+  }
+}
+
+.animate-fade-up {
+  animation: fade-up 0.8s ease-out both;
+}
+
+.animate-fade-in {
+  animation: fade-in 1s ease-out both;
+}
+
+.delay-100 {
+  animation-delay: 100ms;
+}
+.delay-200 {
+  animation-delay: 200ms;
+}
+.delay-300 {
+  animation-delay: 300ms;
+}
+.delay-400 {
+  animation-delay: 400ms;
+}
+
+.stat-number {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.04em;
+}
+
+.section-divider {
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(204, 0, 0, 0.15) 20%,
+    rgba(204, 0, 0, 0.15) 80%,
+    transparent
+  );
+}
+
+.card-hover {
+  transition:
+    transform 0.3s ease,
+    box-shadow 0.3s ease;
+}
+
+@keyframes rfid-pulse-ring {
+  0% {
+    r: 8;
+    opacity: 0.6;
+  }
+  100% {
+    r: 22;
+    opacity: 0;
+  }
+}
+
+.rfid-pulse {
+  animation: rfid-pulse-ring 2.5s ease-out infinite;
+}
+
+.card-hover:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 20px 40px -12px rgba(204, 0, 0, 0.12);
 }
