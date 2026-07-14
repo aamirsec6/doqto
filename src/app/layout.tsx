@@ -18,10 +18,6 @@ export const metadata: Metadata = {
   title: "DOQTO. Every minute, accounted for.",
   description:
     "Real-time intelligence that helps hospitals save the time they lose every day, starting with the minutes that decide whether a patient lives.",
-  icons: {
-    icon: [{ url: "/icon.png", type: "image/png" }],
-    apple: "/icon.png",
-  },
   openGraph: {
     title: "DOQTO. Every minute, accounted for.",
     description:
