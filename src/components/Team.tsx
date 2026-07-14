@@ -7,7 +7,7 @@ const team = [
     role: "Founder",
     description:
       "An emergency doctor who saw how much time hospitals lose every day, and set out to fix it. Leads the business and the clinical thinking.",
-    credentials: "MBBS · MRCEM · MBA",
+    credentials: null,
     photo: "/team/charles-chacko-porathoor.png",
   },
   {

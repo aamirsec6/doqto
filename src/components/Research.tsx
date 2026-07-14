@@ -5,7 +5,7 @@ const stats = [
   },
   {
     value: "−0.570",
-    label: "Effect on staff satisfaction — the strongest factor (p < 0.001)",
+    label: "Effect on staff satisfaction, the strongest factor (p < 0.001)",
   },
   {
     value: "88",
@@ -32,8 +32,8 @@ export function Research() {
           <p className="mt-6 text-lg leading-relaxed text-white/85">
             Before building, we ran a formal study of 88 hospital workers. The
             finding was striking: staff don&apos;t experience safety, locating,
-            equipment, coordination and records as separate problems —
-            statistical analysis collapsed them into a single underlying factor
+            equipment, coordination and records as separate problems.
+            Statistical analysis collapsed them into a single underlying factor
             we call the{" "}
             <span className="font-semibold text-white">
               Visibility Deficit
