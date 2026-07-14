@@ -19,13 +19,14 @@ export const metadata: Metadata = {
   description:
     "Real-time intelligence that helps hospitals save the time they lose every day, starting with the minutes that decide whether a patient lives.",
   icons: {
-    icon: "/icon.png",
+    icon: [{ url: "/icon.png", type: "image/png" }],
+    apple: "/icon.png",
   },
   openGraph: {
     title: "DOQTO. Every minute, accounted for.",
     description:
       "Real-time hospital intelligence. Built by doctors. Based in India.",
-    images: ["/logo.png"],
+    images: ["/og-icon.png"],
   },
 };
 

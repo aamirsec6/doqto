@@ -8,9 +8,9 @@ export function Footer() {
           <Image
             src="/icon.png"
             alt="DOQTO"
-            width={28}
-            height={28}
-            className="h-7 w-7"
+            width={32}
+            height={32}
+            className="h-8 w-8 object-contain"
           />
           <span className="font-display text-sm font-semibold tracking-[0.18em] text-red">
             DOQTO

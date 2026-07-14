@@ -22,9 +22,10 @@ export function Header() {
           <Image
             src="/icon.png"
             alt="DOQTO"
-            width={36}
-            height={36}
-            className="h-9 w-9"
+            width={40}
+            height={40}
+            className="h-10 w-10 object-contain"
+            priority
           />
           <span className="font-display text-lg font-semibold tracking-[0.2em] text-red">
             DOQTO
