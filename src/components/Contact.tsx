@@ -23,7 +23,7 @@ export function Contact() {
         <p className="mt-10 text-center text-sm text-text-muted">
           Prefer LinkedIn?{" "}
           <a
-            href="https://linkedin.com/company/doqto"
+            href="https://www.linkedin.com/company/doqto/"
             target="_blank"
             rel="noopener noreferrer"
             className="font-semibold text-red transition hover:text-red-dark"

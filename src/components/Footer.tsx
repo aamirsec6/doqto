@@ -16,7 +16,17 @@ export function Footer() {
             DOQTO
           </span>
         </div>
-        <p className="text-xs text-text-muted">© 2026 DOQTO · India</p>
+        <div className="flex flex-col items-center gap-2 sm:items-end">
+          <a
+            href="https://www.linkedin.com/company/doqto/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs font-semibold text-red transition hover:text-red-dark"
+          >
+            LinkedIn
+          </a>
+          <p className="text-xs text-text-muted">© 2026 DOQTO · India</p>
+        </div>
       </div>
     </footer>
   );
