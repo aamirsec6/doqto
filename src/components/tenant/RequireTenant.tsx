@@ -16,7 +16,7 @@ export function RequireTenant({
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch("/api/auth/session");
+        const res = await fetch("/api/auth/session", { credentials: "include" });
         const data = await res.json();
         if (cancelled) return;
         if (data.session?.tenantId || data.session?.role === "doqto_admin") {

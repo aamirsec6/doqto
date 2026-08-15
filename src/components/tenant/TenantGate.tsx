@@ -2,13 +2,11 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 type Mode = "join" | "login" | "register";
 
 export function TenantGate({ redirectTo = "/dashboard" }: { redirectTo?: string }) {
-  const router = useRouter();
   const [mode, setMode] = useState<Mode>("join");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -29,6 +27,7 @@ export function TenantGate({ redirectTo = "/dashboard" }: { redirectTo?: string 
         const res = await fetch("/api/auth/join", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
+          credentials: "include",
           body: JSON.stringify({ inviteCode }),
         });
         const data = await res.json();
@@ -37,6 +36,7 @@ export function TenantGate({ redirectTo = "/dashboard" }: { redirectTo?: string 
         const res = await fetch("/api/auth/admin/login", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
+          credentials: "include",
           body: JSON.stringify({ email, password }),
         });
         const data = await res.json();
@@ -45,6 +45,7 @@ export function TenantGate({ redirectTo = "/dashboard" }: { redirectTo?: string 
         const res = await fetch("/api/auth/admin/register", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
+          credentials: "include",
           body: JSON.stringify({
             hospitalName,
             adminEmail: email,
@@ -56,11 +57,11 @@ export function TenantGate({ redirectTo = "/dashboard" }: { redirectTo?: string 
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || "Register failed");
       }
-      router.push(redirectTo);
-      router.refresh();
+      // Full reload so RequireTenant remounts and re-reads the session cookie.
+      // router.push to the same URL (e.g. already on /audit) leaves the gate stuck.
+      window.location.assign(redirectTo);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
-    } finally {
       setBusy(false);
     }
   }
@@ -98,7 +99,10 @@ export function TenantGate({ redirectTo = "/dashboard" }: { redirectTo?: string 
               <button
                 key={id}
                 type="button"
-                onClick={() => setMode(id)}
+                onClick={() => {
+                  setMode(id);
+                  setError("");
+                }}
                 className={`flex-1 px-2 py-1.5 text-[11px] font-semibold ${
                   mode === id
                     ? "bg-white/15 text-[var(--ops-text)]"
