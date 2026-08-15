@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useId, useState, type ReactNode } from "react";
 
 type ModeId = "safety" | "ops" | "assets" | "command";
@@ -904,6 +905,14 @@ export function Solution() {
             Open any path to step into a live-style dashboard and see how that
             part of the hospital is tracked.
           </p>
+          <div className="mt-6">
+            <Link
+              href="/compliance"
+              className="text-sm font-semibold text-red transition hover:text-red-dark"
+            >
+              How we handle hospital data
+            </Link>
+          </div>
         </div>
 
         <div className="mt-12 grid gap-4 sm:grid-cols-2">

@@ -1,9 +1,15 @@
 import Image from "next/image";
+import Link from "next/link";
+
+const footerLinks = [
+  { href: "/compliance", label: "Compliance" },
+  { href: "/#contact", label: "Contact" },
+];
 
 export function Footer() {
   return (
     <footer className="border-t border-red/10 bg-peach-light py-10">
-      <div className="mx-auto flex max-w-6xl flex-col items-center gap-3 px-6 text-center sm:flex-row sm:justify-between sm:text-left">
+      <div className="mx-auto flex max-w-6xl flex-col items-center gap-5 px-6 text-center sm:flex-row sm:justify-between sm:text-left">
         <div className="flex items-center gap-2.5">
           <Image
             src="/icon.png"
@@ -16,7 +22,17 @@ export function Footer() {
             DOQTO
           </span>
         </div>
-        <div className="flex flex-col items-center gap-2 sm:items-end">
+
+        <nav className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2">
+          {footerLinks.map((link) => (
+            <Link
+              key={link.href}
+              href={link.href}
+              className="text-xs font-semibold text-text-muted transition hover:text-red"
+            >
+              {link.label}
+            </Link>
+          ))}
           <a
             href="https://www.linkedin.com/company/doqto/"
             target="_blank"
@@ -25,8 +41,9 @@ export function Footer() {
           >
             LinkedIn
           </a>
-          <p className="text-xs text-text-muted">© 2026 DOQTO · India</p>
-        </div>
+        </nav>
+
+        <p className="text-xs text-text-muted">© 2026 DOQTO · India</p>
       </div>
     </footer>
   );

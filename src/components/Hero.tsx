@@ -35,10 +35,10 @@ export function Hero() {
                 Get in touch
               </a>
               <a
-                href="#problem"
+                href="#dashboard"
                 className="inline-flex items-center justify-center rounded-xl border border-red/20 bg-white/70 px-5 py-3 text-sm font-semibold text-red transition hover:border-red hover:bg-white"
               >
-                Why this exists
+                See the dashboard
               </a>
             </div>
 

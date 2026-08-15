@@ -131,3 +131,54 @@ body {
   transform: translateY(-4px);
   box-shadow: 0 20px 40px -12px rgba(204, 0, 0, 0.12);
 }
+
+/* Command-center live dashboard (inspired digital twin) */
+.ops-shell {
+  --ops-bg: #0b1220;
+  --ops-panel: #121a2b;
+  --ops-panel-2: #182234;
+  --ops-border: rgba(148, 163, 184, 0.14);
+  --ops-text: #e8eef8;
+  --ops-muted: #91a0b8;
+  --ops-cyan: #38bdf8;
+  --ops-green: #34d399;
+  --ops-amber: #fbbf24;
+  --ops-red: #f04343;
+  background: var(--ops-bg);
+  color: var(--ops-text);
+}
+
+.ops-panel {
+  background: #121a2b;
+  border: 1px solid var(--ops-border);
+  border-radius: 6px;
+}
+
+.ops-panel-title {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ops-muted);
+}
+
+@keyframes ops-live-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    box-shadow: 0 0 0 0 rgba(240, 67, 67, 0.55);
+  }
+  50% {
+    opacity: 0.85;
+    box-shadow: 0 0 0 6px rgba(240, 67, 67, 0);
+  }
+}
+
+.ops-live-dot {
+  animation: ops-live-pulse 1.8s ease-out infinite;
+}
+
+.ops-twin-stage,
+.ops-floor-stage {
+  background: #0c1220;
+}

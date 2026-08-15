@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 const milestones = [
   { label: "Problem validated", done: true },
   { label: "System designed", done: true },
@@ -55,6 +57,15 @@ export function Status() {
               </span>
             </div>
           ))}
+        </div>
+
+        <div className="mt-10 flex justify-center text-sm font-semibold">
+          <Link
+            href="/compliance"
+            className="text-red transition hover:text-red-dark"
+          >
+            How we handle hospital data
+          </Link>
         </div>
       </div>
     </section>

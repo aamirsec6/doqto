@@ -5,11 +5,13 @@ import Link from "next/link";
 import { useState } from "react";
 
 const navLinks = [
-  { href: "#problem", label: "Problem" },
-  { href: "#solution", label: "Solution" },
-  { href: "#research", label: "Research" },
-  { href: "#team", label: "Team" },
-  { href: "#contact", label: "Contact" },
+  { href: "/#problem", label: "Problem" },
+  { href: "/#dashboard", label: "Dashboard" },
+  { href: "/#solution", label: "Solution" },
+  { href: "/compliance", label: "Compliance" },
+  { href: "/#research", label: "Research" },
+  { href: "/#team", label: "Team" },
+  { href: "/#contact", label: "Contact" },
 ];
 
 export function Header() {
@@ -18,7 +20,7 @@ export function Header() {
   return (
     <header className="fixed top-0 left-0 right-0 z-50 border-b border-red/10 bg-peach-light/80 backdrop-blur-md">
       <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
-        <Link href="#" className="flex items-center gap-3">
+        <Link href="/" className="flex items-center gap-3">
           <Image
             src="/icon.png"
             alt="DOQTO"
@@ -32,22 +34,28 @@ export function Header() {
           </span>
         </Link>
 
-        <nav className="hidden items-center gap-8 md:flex">
+        <nav className="hidden items-center gap-6 lg:flex">
           {navLinks.map((link) => (
-            <a
+            <Link
               key={link.href}
               href={link.href}
               className="text-sm font-medium text-text-muted transition-colors hover:text-red"
             >
               {link.label}
-            </a>
+            </Link>
           ))}
+          <Link
+            href="/#contact"
+            className="rounded-xl bg-red px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-dark"
+          >
+            Get in touch
+          </Link>
         </nav>
 
         <button
           type="button"
           onClick={() => setOpen(!open)}
-          className="flex h-10 w-10 items-center justify-center rounded-lg text-red md:hidden"
+          className="flex h-10 w-10 items-center justify-center rounded-lg text-red lg:hidden"
           aria-label="Toggle menu"
         >
           {open ? (
@@ -63,18 +71,25 @@ export function Header() {
       </div>
 
       {open && (
-        <nav className="border-t border-red/10 bg-peach-light px-6 py-4 md:hidden">
+        <nav className="border-t border-red/10 bg-peach-light px-6 py-4 lg:hidden">
           <div className="flex flex-col gap-4">
             {navLinks.map((link) => (
-              <a
+              <Link
                 key={link.href}
                 href={link.href}
                 onClick={() => setOpen(false)}
                 className="text-base font-medium text-text-muted transition-colors hover:text-red"
               >
                 {link.label}
-              </a>
+              </Link>
             ))}
+            <Link
+              href="/#contact"
+              onClick={() => setOpen(false)}
+              className="inline-flex w-fit rounded-xl bg-red px-4 py-2 text-sm font-semibold text-white"
+            >
+              Get in touch
+            </Link>
           </div>
         </nav>
       )}

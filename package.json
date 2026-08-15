@@ -6,13 +6,18 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "dev:realtime": "node server/realtime.mjs",
+    "dev:all": "concurrently -k -n next,rt -c cyan,magenta \"next dev\" \"node server/realtime.mjs\""
   },
   "dependencies": {
+    "concurrently": "^9.2.4",
     "next": "16.2.10",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "resend": "^6.17.2",
+    "socket.io": "^4.8.3",
+    "socket.io-client": "^4.8.3",
     "vercel": "^54.21.1"
   },
   "devDependencies": {
