@@ -33,5 +33,6 @@ COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/prisma.config.ts ./
 COPY --from=builder /app/server ./server
 COPY --from=builder /app/next.config.* ./
+RUN chmod +x ./server/web-start.sh
 EXPOSE 3000
-CMD ["sh", "-c", "npx prisma migrate deploy && npm run start"]
+CMD ["./server/web-start.sh"]
