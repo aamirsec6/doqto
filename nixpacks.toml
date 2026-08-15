@@ -1,9 +1,0 @@
-[variables]
-NIXPACKS_NODE_VERSION = "22"
-
-[phases.build]
-cmds = [
-  "npx prisma generate",
-  "npx prisma migrate deploy",
-  "npx next build"
-]
