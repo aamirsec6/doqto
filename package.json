@@ -8,7 +8,9 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start",
+    "start": "node server/start.mjs",
+    "start:web": "next start",
+    "start:realtime": "node server/realtime.mjs",
     "lint": "eslint",
     "dev:realtime": "node server/realtime.mjs",
     "dev:all": "concurrently -k -n next,rt -c cyan,magenta \"next dev\" \"node server/realtime.mjs\""
