@@ -1,5 +1,7 @@
 FROM node:22-bookworm-slim AS deps
 WORKDIR /app
+# Placeholder only — generate/client does not connect; migrate uses real DATABASE_URL at runtime.
+ENV DATABASE_URL="postgresql://postgres:postgres@127.0.0.1:5432/postgres"
 RUN apt-get update -y && apt-get install -y openssl ca-certificates && rm -rf /var/lib/apt/lists/*
 COPY package.json package-lock.json ./
 COPY prisma ./prisma
@@ -8,10 +10,11 @@ RUN npm ci
 
 FROM node:22-bookworm-slim AS builder
 WORKDIR /app
+ENV DATABASE_URL="postgresql://postgres:postgres@127.0.0.1:5432/postgres"
+ENV NEXT_TELEMETRY_DISABLED=1
 RUN apt-get update -y && apt-get install -y openssl ca-certificates && rm -rf /var/lib/apt/lists/*
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-ENV NEXT_TELEMETRY_DISABLED=1
 RUN npx prisma generate
 RUN npx next build
 
