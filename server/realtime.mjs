@@ -13,7 +13,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, "..");
 const DATA_DIR = join(ROOT, ".data");
 const DATA_FILE = join(DATA_DIR, "hospital-messages.json");
-const PORT = Number(process.env.REALTIME_PORT || 3001);
+const PORT = Number(process.env.PORT || process.env.REALTIME_PORT || 3001);
 
 /** @type {{ messages: any[], presence: Record<string, any> }} */
 let state = { messages: [], presence: {} };
