@@ -13,7 +13,6 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
 RUN npx prisma generate
-RUN npx prisma migrate deploy
 RUN npx next build
 
 FROM node:22-bookworm-slim AS runner
@@ -32,4 +31,4 @@ COPY --from=builder /app/prisma.config.ts ./
 COPY --from=builder /app/server ./server
 COPY --from=builder /app/next.config.* ./
 EXPOSE 3000
-CMD ["npm", "run", "start"]
+CMD ["sh", "-c", "npx prisma migrate deploy && npm run start"]
