@@ -1,0 +1,223 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Tenant {
+  id         String   @id @default(cuid())
+  name       String
+  slug       String   @unique
+  inviteCode String   @unique
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  admins    AdminUser[]
+  layout    WardLayout?
+  staff     StaffMember[]
+  beds      Bed[]
+  assets    Asset[]
+  rooms     Room[]
+  incidents Incident[]
+  messages  Message[]
+  alerts    Alert[]
+  audits    AuditEvent[]
+}
+
+model AdminUser {
+  id           String   @id @default(cuid())
+  tenantId     String
+  email        String
+  passwordHash String
+  name         String?
+  createdAt    DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, email])
+  @@index([tenantId])
+}
+
+model WardLayout {
+  id            String   @id @default(cuid())
+  tenantId      String   @unique
+  hospitalName  String
+  contactName   String   @default("")
+  contactRole   String   @default("")
+  wardName      String
+  wardType      String   @default("icu")
+  floorLabel    String   @default("")
+  layoutStyle   String   @default("bays")
+  trackAssets   Boolean  @default(true)
+  zonesJson     Json
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+}
+
+model Room {
+  id       String @id @default(cuid())
+  tenantId String
+  key      String
+  label    String
+  kind     String @default("clinical")
+  path     String @default("")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, key])
+  @@index([tenantId])
+}
+
+model StaffMember {
+  id          String   @id @default(cuid())
+  tenantId    String
+  externalId  String
+  name        String
+  role        String
+  status      String   @default("free")
+  roomKey     String   @default("")
+  lastSeenMin Int      @default(0)
+  posX        Float    @default(0)
+  posY        Float    @default(0)
+  updatedAt   DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, externalId])
+  @@index([tenantId])
+  @@index([tenantId, status])
+}
+
+model Bed {
+  id              String  @id @default(cuid())
+  tenantId        String
+  externalId      String
+  label           String
+  roomKey         String
+  status          String  @default("available")
+  patientInitials String?
+  posX            Float   @default(0)
+  posY            Float   @default(0)
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, externalId])
+  @@index([tenantId])
+}
+
+model Asset {
+  id          String @id @default(cuid())
+  tenantId    String
+  externalId  String
+  name        String
+  kind        String
+  status      String @default("available")
+  roomKey     String @default("")
+  lastSeenMin Int    @default(0)
+  posX        Float  @default(0)
+  posY        Float  @default(0)
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, externalId])
+  @@index([tenantId])
+}
+
+model Incident {
+  id           String    @id @default(cuid())
+  tenantId     String
+  code         String
+  title        String
+  detail       String    @default("")
+  lifecycle    String    @default("open")
+  sourceWard   String    @default("")
+  roomKey      String    @default("")
+  roomLabel    String    @default("")
+  raisedAt     DateTime  @default(now())
+  resolvedAt   DateTime?
+  wardAlertId  String?
+  pagedStaffIds Json     @default("[]")
+  acksJson     Json      @default("[]")
+  timelineJson Json      @default("[]")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([tenantId, lifecycle])
+  @@index([tenantId, raisedAt])
+}
+
+model Alert {
+  id                  String    @id @default(cuid())
+  tenantId            String
+  externalId          String
+  severity            String
+  kind                String
+  title               String
+  detail              String    @default("")
+  roomKey             String
+  raisedAt            DateTime  @default(now())
+  lifecycle           String    @default("open")
+  acknowledged        Boolean   @default(false)
+  acknowledgedAt      DateTime?
+  acknowledgedBy      String?
+  hospitalIncidentId  String?
+  dispatchedJson      Json?
+  nearestAssetsJson   Json?
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, externalId])
+  @@index([tenantId])
+  @@index([tenantId, lifecycle])
+}
+
+model Message {
+  id            String   @id @default(cuid())
+  tenantId      String
+  channelId     String
+  channelKind   String
+  body          String
+  kind          String   @default("text")
+  authorId      String
+  authorName    String
+  authorRole    String   @default("")
+  incidentId    String?
+  targetStaffId String?
+  targetRole    String?
+  priority      String   @default("normal")
+  createdAt     DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, channelId])
+  @@index([tenantId, createdAt])
+  @@index([tenantId, incidentId])
+}
+
+model AuditEvent {
+  id         String   @id @default(cuid())
+  tenantId   String
+  actorType  String
+  actorId    String   @default("")
+  actorName  String   @default("")
+  action     String
+  entityType String
+  entityId   String   @default("")
+  entityLabel String  @default("")
+  before     Json?
+  after      Json?
+  ip         String?
+  createdAt  DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, createdAt])
+  @@index([tenantId, action])
+  @@index([createdAt])
+}

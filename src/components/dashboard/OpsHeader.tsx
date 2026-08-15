@@ -118,6 +118,13 @@ export function OpsHeader({
             My board
           </Link>
 
+          <Link
+            href="/audit"
+            className="border border-white/10 px-2.5 py-1.5 text-[11px] font-semibold text-[var(--ops-muted)] transition hover:border-white/25 hover:text-[var(--ops-text)]"
+          >
+            Audit
+          </Link>
+
           <div className="flex border border-white/10 bg-black/20 p-0.5">
             {roles.map((r) => (
               <button

@@ -43,3 +43,5 @@ next-env.d.ts
 # realtime persistence
 .data/
 .data
+
+/src/generated/prisma

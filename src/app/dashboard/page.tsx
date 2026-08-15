@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { DashboardApp } from "@/components/dashboard/DashboardView";
+import { RequireTenant } from "@/components/tenant/RequireTenant";
 
 export const metadata: Metadata = {
   title: "Digital twin · DOQTO",
@@ -8,5 +9,9 @@ export const metadata: Metadata = {
 };
 
 export default function DashboardPage() {
-  return <DashboardApp />;
+  return (
+    <RequireTenant redirectTo="/dashboard">
+      <DashboardApp />
+    </RequireTenant>
+  );
 }

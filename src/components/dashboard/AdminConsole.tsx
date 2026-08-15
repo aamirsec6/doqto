@@ -75,15 +75,35 @@ export function AdminConsole() {
       <div className="ops-shell flex min-h-dvh items-center justify-center px-6">
         <form
           className="ops-panel w-full max-w-md p-6"
-          onSubmit={(e) => {
+          onSubmit={async (e) => {
             e.preventDefault();
-            if (pass === ADMIN_PASS) {
+            try {
+              const res = await fetch("/api/auth/session", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  action: "doqto_admin",
+                  passcode: pass,
+                }),
+              });
+              const data = await res.json();
+              if (!res.ok) {
+                setError(data.error || "Incorrect passcode.");
+                return;
+              }
               sessionStorage.setItem(ADMIN_SESSION_KEY, "1");
               setUnlocked(true);
               setError("");
-              return;
+            } catch {
+              // Fallback for offline/local demo without DB
+              if (pass === ADMIN_PASS) {
+                sessionStorage.setItem(ADMIN_SESSION_KEY, "1");
+                setUnlocked(true);
+                setError("");
+                return;
+              }
+              setError("Incorrect passcode.");
             }
-            setError("Incorrect passcode.");
           }}
         >
           <div className="flex items-center gap-2">
@@ -143,6 +163,12 @@ export function AdminConsole() {
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <Link
+              href="/audit"
+              className="rounded-lg border border-white/10 px-3 py-1.5 text-[11px] font-semibold text-[var(--ops-muted)] hover:text-sky-300"
+            >
+              Hospital audit
+            </Link>
+            <Link
               href="/dashboard"
               className="rounded-lg border border-white/10 px-3 py-1.5 text-[11px] font-semibold text-[var(--ops-muted)] hover:text-sky-300"
             >
@@ -152,6 +178,7 @@ export function AdminConsole() {
               type="button"
               onClick={() => {
                 sessionStorage.removeItem(ADMIN_SESSION_KEY);
+                fetch("/api/auth/session", { method: "DELETE" }).catch(() => {});
                 setUnlocked(false);
               }}
               className="rounded-lg border border-white/10 px-3 py-1.5 text-[11px] font-semibold text-[var(--ops-muted)] hover:text-[#f04343]"
@@ -163,6 +190,8 @@ export function AdminConsole() {
       </header>
 
       <main className="mx-auto flex max-w-6xl flex-col gap-4 p-4 md:p-6">
+        <CrossTenantAuditPanel unlocked={unlocked} />
+
         <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <Kpi label="Events" value={String(stats.total)} />
           <Kpi label="Sessions" value={String(stats.sessions)} />
@@ -367,6 +396,152 @@ export function AdminConsole() {
         </section>
       </main>
     </div>
+  );
+}
+
+function CrossTenantAuditPanel({ unlocked }: { unlocked: boolean }) {
+  const [tenants, setTenants] = useState<
+    { id: string; name: string; slug: string; inviteCode?: string }[]
+  >([]);
+  const [rows, setRows] = useState<
+    {
+      id: string;
+      createdAt: string;
+      tenantId: string;
+      action: string;
+      actorName: string;
+      entityLabel: string;
+      tenant?: { name: string };
+    }[]
+  >([]);
+  const [tenantId, setTenantId] = useState("");
+  const [q, setQ] = useState("");
+  const [note, setNote] = useState("");
+
+  useEffect(() => {
+    if (!unlocked) return;
+    (async () => {
+      try {
+        const [tRes, aRes] = await Promise.all([
+          fetch("/api/admin/tenants"),
+          fetch("/api/audit?scope=all&limit=100"),
+        ]);
+        if (tRes.ok) {
+          const t = await tRes.json();
+          setTenants(t.tenants || []);
+        }
+        if (aRes.ok) {
+          const a = await aRes.json();
+          setRows(a.rows || []);
+        } else {
+          setNote("DB audit unavailable until Postgres session is active.");
+        }
+      } catch {
+        setNote("Could not reach tenant audit API.");
+      }
+    })();
+  }, [unlocked]);
+
+  const reload = async () => {
+    const params = new URLSearchParams({ scope: "all", limit: "100" });
+    if (tenantId) params.set("tenantId", tenantId);
+    if (q) params.set("q", q);
+    const aRes = await fetch(`/api/audit?${params}`);
+    if (aRes.ok) {
+      const a = await aRes.json();
+      setRows(a.rows || []);
+      setNote("");
+    }
+  };
+
+  return (
+    <section className="ops-panel p-4 md:p-5">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <p className="ops-panel-title">Cross-tenant audit (Postgres)</p>
+          <p className="mt-1 text-[12px] text-[var(--ops-muted)]">
+            All hospitals · ACID append-only events
+          </p>
+          {note ? (
+            <p className="mt-1 text-[11px] text-amber-300">{note}</p>
+          ) : null}
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <select
+            value={tenantId}
+            onChange={(e) => setTenantId(e.target.value)}
+            className="border border-white/10 bg-black/30 px-2 py-1.5 text-[12px] text-[var(--ops-text)]"
+          >
+            <option value="">All tenants</option>
+            {tenants.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.name}
+              </option>
+            ))}
+          </select>
+          <input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Search"
+            className="border border-white/10 bg-black/30 px-2 py-1.5 text-[12px] text-[var(--ops-text)]"
+          />
+          <button
+            type="button"
+            onClick={reload}
+            className="border border-white/10 px-3 py-1.5 text-[11px] font-semibold"
+          >
+            Filter
+          </button>
+          <a
+            href={`/api/audit?scope=all&format=csv${tenantId ? `&tenantId=${tenantId}` : ""}${q ? `&q=${encodeURIComponent(q)}` : ""}`}
+            className="border border-sky-700/40 bg-sky-950/30 px-3 py-1.5 text-[11px] font-semibold text-sky-100"
+          >
+            Export CSV
+          </a>
+        </div>
+      </div>
+      <div className="mt-4 overflow-x-auto">
+        <table className="min-w-full text-left text-[12px]">
+          <thead className="border-b border-white/10 text-[10px] uppercase text-[var(--ops-muted)]">
+            <tr>
+              <th className="px-2 py-2">When</th>
+              <th className="px-2 py-2">Tenant</th>
+              <th className="px-2 py-2">Action</th>
+              <th className="px-2 py-2">Actor</th>
+              <th className="px-2 py-2">Entity</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-white/5">
+            {rows.map((r) => (
+              <tr key={r.id}>
+                <td className="px-2 py-2 whitespace-nowrap text-[var(--ops-muted)]">
+                  {new Date(r.createdAt).toLocaleString("en-IN")}
+                </td>
+                <td className="px-2 py-2">{r.tenant?.name || r.tenantId.slice(0, 8)}</td>
+                <td className="px-2 py-2 font-medium">{r.action}</td>
+                <td className="px-2 py-2 text-[var(--ops-muted)]">{r.actorName || "—"}</td>
+                <td className="px-2 py-2">{r.entityLabel || "—"}</td>
+              </tr>
+            ))}
+            {rows.length === 0 && (
+              <tr>
+                <td colSpan={5} className="px-2 py-6 text-center text-[var(--ops-muted)]">
+                  No Postgres audit rows yet — register a hospital tenant to begin.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+      {tenants.length > 0 && (
+        <p className="mt-3 text-[11px] text-[var(--ops-muted)]">
+          Tenants:{" "}
+          {tenants
+            .map((t) => `${t.name} (${t.inviteCode || t.slug})`)
+            .join(" · ")}
+        </p>
+      )}
+    </section>
   );
 }
 

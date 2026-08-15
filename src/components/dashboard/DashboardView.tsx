@@ -64,9 +64,31 @@ export function DashboardApp() {
     return (
       <OnboardingWizard
         initial={forceOnboard ? layout : null}
-        onComplete={(config) => {
+        onComplete={async (config) => {
           saveLayout(config);
           window.localStorage.removeItem(OPS_STORAGE_KEY);
+          try {
+            await fetch("/api/tenant/snapshot", {
+              method: "PUT",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                layout: {
+                  hospitalName: config.hospitalName,
+                  contactName: config.contactName,
+                  contactRole: config.contactRole,
+                  wardName: config.wardName,
+                  wardType: config.wardType,
+                  floorLabel: config.floorLabel,
+                  layoutStyle: config.layoutStyle,
+                  trackAssets: config.trackAssets,
+                  zones: config.zones,
+                  staffRoster: config.staffRoster,
+                },
+              }),
+            });
+          } catch {
+            /* local layout still saved */
+          }
           logTrainingEvent({
             ward: {
               hospital: config.hospitalName,

@@ -12,6 +12,11 @@ import {
   raiseHospitalCodeWithWard,
   resolveFromHospital,
 } from "@/lib/hospital/bridge";
+import {
+  apiAckIncident,
+  apiRaiseIncident,
+  apiResolveIncident,
+} from "@/lib/hospital/apiClient";
 import { activeIncidents, pageStaff } from "@/lib/hospital/incidents";
 import {
   postQuickReplyMessage,
@@ -205,25 +210,50 @@ export function OpsBoard() {
     );
   }
 
-  const raise = (code: HospitalCode) => {
+  const raise = async (code: HospitalCode) => {
     const roomId = zoneId || ward.rooms[0]?.id;
     if (!roomId) return;
+    const roomLabel =
+      ward.rooms.find((r) => r.id === roomId)?.label ?? roomId;
+    const api = await apiRaiseIncident({
+      code,
+      roomKey: roomId,
+      roomLabel,
+      sourceWard: ward.ward,
+    });
     const result = raiseHospitalCodeWithWard(layout, ward, {
       code,
       roomId,
       actorRole: "ops",
     });
+    if (api?.incident?.id && result.tenant.incidents[0]) {
+      const patched = {
+        ...result.tenant,
+        incidents: result.tenant.incidents.map((inc, i) =>
+          i === 0 ? { ...inc, dbId: api.incident.id as string } : inc,
+        ),
+      };
+      setTenant(patched);
+    } else {
+      setTenant(result.tenant);
+    }
     setWard(result.ward);
-    setTenant(result.tenant);
     setChannelId(channelIdIncident(result.incidentId));
   };
 
-  const ack = (incident: HospitalIncident) => {
+  const ack = async (incident: HospitalIncident) => {
     const name =
       incident.pagedStaffIds[0]
         ? tenant.staffDirectory.find((s) => s.id === incident.pagedStaffIds[0])
             ?.name ?? "Staff"
         : "Ops desk";
+    if (incident.dbId) {
+      await apiAckIncident({
+        incidentId: incident.dbId,
+        staffId: incident.pagedStaffIds[0],
+        staffName: name,
+      });
+    }
     const result = acknowledgeFromHospital(layout, ward, tenant, incident.id, {
       staffId: incident.pagedStaffIds[0],
       staffName: name,
@@ -244,7 +274,13 @@ export function OpsBoard() {
     });
   };
 
-  const resolve = (incident: HospitalIncident) => {
+  const resolve = async (incident: HospitalIncident) => {
+    if (incident.dbId) {
+      await apiResolveIncident({
+        incidentId: incident.dbId,
+        resolvedBy: "Ops desk",
+      });
+    }
     const result = resolveFromHospital(
       layout,
       ward,
@@ -327,6 +363,12 @@ export function OpsBoard() {
               className="border border-sky-700/40 bg-sky-950/30 px-2.5 py-1.5 text-[11px] font-semibold text-sky-100"
             >
               My board
+            </Link>
+            <Link
+              href="/audit"
+              className="border border-white/10 px-2.5 py-1.5 text-[11px] font-semibold text-[var(--ops-muted)]"
+            >
+              Audit
             </Link>
             <Link
               href="/dashboard"

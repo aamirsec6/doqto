@@ -16,6 +16,10 @@ import {
   raiseHospitalCodeWithWard,
 } from "@/lib/hospital/bridge";
 import {
+  apiAckIncident,
+  apiRaiseIncident,
+} from "@/lib/hospital/apiClient";
+import {
   incidentsForStaff,
   postQuickReplyMessage,
 } from "@/lib/hospital/intercom";
@@ -189,10 +193,20 @@ export function StaffBoard() {
     return (
       <StaffPicker
         tenant={tenant}
-        onPick={(entry) => {
+        onPick={async (entry) => {
           const next = createStaffSession(entry);
           saveStaffSession(next);
           setSession(next);
+          await fetch("/api/auth/session", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              action: "staff_identity",
+              staffId: entry.staffId,
+              staffName: entry.name,
+              staffRole: entry.role,
+            }),
+          }).catch(() => {});
         }}
       />
     );
@@ -201,17 +215,35 @@ export function StaffBoard() {
   const role = resolveRoleCategory(session.role, session.name);
   const me = tenant.staffDirectory.find((s) => s.id === session.staffId);
 
-  const raise = (code: HospitalCode) => {
+  const raise = async (code: HospitalCode) => {
     const roomId = zoneId || ward.rooms[0]?.id;
     if (!roomId) return;
+    const roomLabel =
+      ward.rooms.find((r) => r.id === roomId)?.label ?? roomId;
+    const api = await apiRaiseIncident({
+      code,
+      roomKey: roomId,
+      roomLabel,
+      sourceWard: ward.ward,
+      title: `${CODE_LABELS[code]} · raised by ${session.name}`,
+    });
     const result = raiseHospitalCodeWithWard(layout, ward, {
       code,
       roomId,
       actorRole: session.roleCategory === "nurse" ? "nurse" : "charge",
       title: `${CODE_LABELS[code]} · raised by ${session.name}`,
     });
+    if (api?.incident?.id && result.tenant.incidents[0]) {
+      setTenant({
+        ...result.tenant,
+        incidents: result.tenant.incidents.map((inc, i) =>
+          i === 0 ? { ...inc, dbId: api.incident.id as string } : inc,
+        ),
+      });
+    } else {
+      setTenant(result.tenant);
+    }
     setWard(result.ward);
-    setTenant(result.tenant);
     setFlash(`${CODE_LABELS[code]} sent to staff net`);
     setTimeout(() => setFlash(""), 3000);
   };
@@ -235,7 +267,7 @@ export function StaffBoard() {
     setTenant(nextTenant);
   };
 
-  const reply = (incident: HospitalIncident, body: string, doAck: boolean) => {
+  const reply = async (incident: HospitalIncident, body: string, doAck: boolean) => {
     postQuickReplyMessage({
       body,
       kind: doAck ? "ack" : "quick_reply",
@@ -248,6 +280,13 @@ export function StaffBoard() {
       priority: "urgent",
     });
     if (doAck) {
+      if (incident.dbId) {
+        await apiAckIncident({
+          incidentId: incident.dbId,
+          staffId: session.staffId,
+          staffName: session.name,
+        });
+      }
       const result = acknowledgeFromHospital(
         layout,
         ward,

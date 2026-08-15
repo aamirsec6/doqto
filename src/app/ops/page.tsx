@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { OpsBoard } from "@/components/ops/OpsBoard";
+import { RequireTenant } from "@/components/tenant/RequireTenant";
 
 export const metadata: Metadata = {
   title: "Hospital ops · DOQTO",
@@ -8,5 +9,9 @@ export const metadata: Metadata = {
 };
 
 export default function OpsPage() {
-  return <OpsBoard />;
+  return (
+    <RequireTenant redirectTo="/ops">
+      <OpsBoard />
+    </RequireTenant>
+  );
 }

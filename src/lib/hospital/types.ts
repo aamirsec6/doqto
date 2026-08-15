@@ -54,6 +54,8 @@ export interface HospitalIncident {
   acks: IncidentAck[];
   timeline: TimelineEvent[];
   resolvedAt?: string;
+  /** Postgres incident id when dual-written to tenant DB */
+  dbId?: string;
 }
 
 export interface HospitalTenant {
