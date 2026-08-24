@@ -10,6 +10,13 @@ const roles: { id: ViewerRole; label: string; hint: string }[] = [
   { id: "ops", label: "Ops", hint: "Admin" },
 ];
 
+interface UnitOption {
+  floorId: string;
+  unitId: string;
+  label: string;
+  active: boolean;
+}
+
 interface Props {
   hospital: string;
   ward: string;
@@ -21,6 +28,8 @@ interface Props {
   trackingLive: boolean;
   lastUpdateLabel: string;
   onRemap?: () => void;
+  unitOptions?: UnitOption[];
+  onUnitChange?: (floorId: string, unitId: string) => void;
 }
 
 export function OpsHeader({
@@ -34,6 +43,8 @@ export function OpsHeader({
   trackingLive,
   lastUpdateLabel,
   onRemap,
+  unitOptions,
+  onUnitChange,
 }: Props) {
   return (
     <header className="shrink-0 border-b border-[var(--ops-border)] bg-[#0d1524]">
@@ -57,6 +68,33 @@ export function OpsHeader({
         </div>
 
         <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+          {unitOptions && unitOptions.length > 1 && onUnitChange && (
+            <label className="flex items-center gap-2 border border-white/10 bg-black/20 px-2 py-1">
+              <span className="text-[10px] font-semibold tracking-wider text-[var(--ops-muted)] uppercase">
+                Unit
+              </span>
+              <select
+                value={
+                  unitOptions.find((o) => o.active)?.unitId ??
+                  unitOptions[0]?.unitId
+                }
+                onChange={(e) => {
+                  const opt = unitOptions.find(
+                    (o) => o.unitId === e.target.value,
+                  );
+                  if (opt) onUnitChange(opt.floorId, opt.unitId);
+                }}
+                className="max-w-[200px] truncate bg-transparent text-[11px] font-semibold text-[var(--ops-text)] outline-none"
+              >
+                {unitOptions.map((opt) => (
+                  <option key={opt.unitId} value={opt.unitId}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+
           <div
             className={`flex items-center gap-2 border px-3 py-1.5 ${
               trackingLive

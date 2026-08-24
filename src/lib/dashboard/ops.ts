@@ -7,6 +7,7 @@ import {
   OPS_STORAGE_KEY,
   buildWardFromLayout,
   mergeWardWithLayout,
+  opsStorageKey,
   wardSummary,
 } from "./layout";
 import { roomCenter } from "./status";
@@ -29,8 +30,9 @@ export type OpsContext = {
 
 export function loadOps(layout: LayoutConfig): WardSnapshot {
   if (typeof window === "undefined") return buildWardFromLayout(layout);
+  const key = opsStorageKey(layout.layoutId);
   try {
-    const raw = window.localStorage.getItem(OPS_STORAGE_KEY);
+    const raw = window.localStorage.getItem(key);
     if (!raw) return buildWardFromLayout(layout);
     const previous = JSON.parse(raw) as WardSnapshot;
     previous.alerts = (previous.alerts ?? []).map((a) => normalizeAlert(a));
@@ -45,10 +47,13 @@ export function loadOps(layout: LayoutConfig): WardSnapshot {
   }
 }
 
-export function saveOps(ward: WardSnapshot) {
+export function saveOps(ward: WardSnapshot, layoutId?: string) {
   if (typeof window === "undefined") return;
-  window.localStorage.setItem(OPS_STORAGE_KEY, JSON.stringify(ward));
-  window.dispatchEvent(new CustomEvent("doqto-ops-updated"));
+  const key = opsStorageKey(layoutId);
+  window.localStorage.setItem(key, JSON.stringify(ward));
+  window.dispatchEvent(
+    new CustomEvent("doqto-ops-updated", { detail: { layoutId } }),
+  );
 }
 
 function stamp(ward: WardSnapshot): WardSnapshot {

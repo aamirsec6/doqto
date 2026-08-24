@@ -166,7 +166,7 @@ export interface StaffRosterEntry {
 }
 
 export interface LayoutConfig {
-  version: 1 | 2;
+  version: 1 | 2 | 3;
   hospitalName: string;
   contactName: string;
   contactRole: string;
@@ -179,4 +179,40 @@ export interface LayoutConfig {
   staffRoster: StaffRosterEntry[];
   createdAt: string;
   calibration?: MapCalibration;
+  /** Multi-floor: server/client ids */
+  layoutId?: string;
+  floorId?: string;
+}
+
+/** One ward/unit on a floor. */
+export interface UnitLayoutConfig {
+  id: string;
+  floorId: string;
+  wardName: string;
+  wardType: WardType;
+  layoutStyle: LayoutStyle;
+  zones: LayoutZone[];
+  trackAssets: boolean;
+  calibration?: MapCalibration;
+}
+
+export interface FloorConfig {
+  id: string;
+  label: string;
+  building: string;
+  sortOrder: number;
+  units: UnitLayoutConfig[];
+}
+
+/** Hospital-wide campus with multiple floors and units. */
+export interface CampusConfig {
+  version: 3;
+  hospitalName: string;
+  contactName: string;
+  contactRole: string;
+  staffRoster: StaffRosterEntry[];
+  floors: FloorConfig[];
+  activeFloorId: string;
+  activeUnitId: string;
+  createdAt: string;
 }

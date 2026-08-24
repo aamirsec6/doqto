@@ -1,3 +1,9 @@
+import {
+  getActiveUnit,
+  loadCampus,
+  saveCampus,
+  unitToLayoutConfig,
+} from "./campus";
 import { layoutGeometry } from "@/lib/map/geometry";
 import { defaultZonesForOpd } from "@/lib/map/opd-template";
 import { roomCenter } from "./status";
@@ -17,6 +23,10 @@ import type {
 
 export const LAYOUT_STORAGE_KEY = "doqto.ward.layout.v2";
 export const OPS_STORAGE_KEY = "doqto.ward.ops.v1";
+
+export function opsStorageKey(layoutId?: string) {
+  return layoutId ? `${OPS_STORAGE_KEY}.${layoutId}` : OPS_STORAGE_KEY;
+}
 
 export { layoutGeometry } from "@/lib/map/geometry";
 
@@ -94,6 +104,12 @@ export function layoutFingerprint(config: LayoutConfig): string {
 
 export function loadLayout(): LayoutConfig | null {
   if (typeof window === "undefined") return null;
+  const campus = loadCampus();
+  if (campus) {
+    const active = getActiveUnit(campus);
+    if (!active) return null;
+    return unitToLayoutConfig(campus, active.floor, active.unit);
+  }
   try {
     const raw =
       window.localStorage.getItem(LAYOUT_STORAGE_KEY) ??
@@ -118,6 +134,40 @@ export function loadLayout(): LayoutConfig | null {
 }
 
 export function saveLayout(config: LayoutConfig) {
+  if (config.version === 3 && config.layoutId && config.floorId) {
+    const campus = loadCampus();
+    if (campus) {
+      const floors = campus.floors.map((floor) =>
+        floor.id === config.floorId
+          ? {
+              ...floor,
+              units: floor.units.map((unit) =>
+                unit.id === config.layoutId
+                  ? {
+                      ...unit,
+                      wardName: config.wardName,
+                      wardType: config.wardType,
+                      layoutStyle: config.layoutStyle,
+                      zones: config.zones,
+                      trackAssets: config.trackAssets,
+                      calibration: config.calibration,
+                    }
+                  : unit,
+              ),
+            }
+          : floor,
+      );
+      saveCampus({
+        ...campus,
+        hospitalName: config.hospitalName,
+        contactName: config.contactName,
+        contactRole: config.contactRole,
+        staffRoster: config.staffRoster,
+        floors,
+      });
+      return;
+    }
+  }
   window.localStorage.setItem(LAYOUT_STORAGE_KEY, JSON.stringify(config));
 }
 

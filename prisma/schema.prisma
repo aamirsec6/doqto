@@ -16,7 +16,8 @@ model Tenant {
   updatedAt  DateTime @updatedAt
 
   admins    AdminUser[]
-  layout    WardLayout?
+  floors    Floor[]
+  layouts   WardLayout[]
   staff     StaffMember[]
   beds      Bed[]
   assets    Asset[]
@@ -41,9 +42,25 @@ model AdminUser {
   @@index([tenantId])
 }
 
+model Floor {
+  id        String   @id @default(cuid())
+  tenantId  String
+  label     String
+  building  String   @default("")
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant  Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  layouts WardLayout[]
+
+  @@index([tenantId])
+}
+
 model WardLayout {
   id            String   @id @default(cuid())
-  tenantId      String   @unique
+  tenantId      String
+  floorId       String
   hospitalName  String
   contactName   String   @default("")
   contactRole   String   @default("")
@@ -59,11 +76,18 @@ model WardLayout {
   updatedAt        DateTime @updatedAt
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  floor  Floor  @relation(fields: [floorId], references: [id], onDelete: Cascade)
+  rooms  Room[]
+
+  @@unique([floorId, wardName])
+  @@index([tenantId])
+  @@index([floorId])
 }
 
 model Room {
   id           String  @id @default(cuid())
   tenantId     String
+  layoutId     String
   key          String
   label        String
   kind         String  @default("clinical")
@@ -71,10 +95,12 @@ model Room {
   parentKey    String?
   verticesJson Json?
 
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  layout WardLayout @relation(fields: [layoutId], references: [id], onDelete: Cascade)
 
-  @@unique([tenantId, key])
+  @@unique([layoutId, key])
   @@index([tenantId])
+  @@index([layoutId])
 }
 
 model StaffMember {

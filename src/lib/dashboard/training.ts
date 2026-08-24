@@ -19,7 +19,8 @@ export type TrainingAction =
   | "alert.raise"
   | "alert.dispatch"
   | "alert.acknowledge"
-  | "layout.saved";
+  | "layout.saved"
+  | "campus.saved";
 
 export interface TrainingEvent {
   /** Unique event id */

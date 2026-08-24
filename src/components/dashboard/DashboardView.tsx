@@ -10,9 +10,18 @@ import { StaffDirectory } from "@/components/dashboard/StaffDirectory";
 import { ActionStrip } from "@/components/dashboard/ActionStrip";
 import { TrackingControl } from "@/components/dashboard/TrackingControl";
 import {
+  allUnits,
+  campusToApiPayload,
+  getActiveUnit,
+  loadCampus,
+  saveCampus,
+  setActiveUnit,
+  unitToLayoutConfig,
+} from "@/lib/dashboard/campus";
+import {
   OPS_STORAGE_KEY,
   loadLayout,
-  saveLayout,
+  opsStorageKey,
   wardSummary,
 } from "@/lib/dashboard/layout";
 import {
@@ -36,6 +45,7 @@ import { applyTrackingLocations } from "@/lib/tracking/apply";
 import type { ResolvedLocation } from "@/lib/tracking/types";
 import { logTrainingEvent } from "@/lib/dashboard/training";
 import type {
+  CampusConfig,
   Focus,
   LayoutConfig,
   ViewerRole,
@@ -44,13 +54,20 @@ import type {
 
 export function DashboardApp() {
   const [ready, setReady] = useState(false);
-  const [layout, setLayout] = useState<LayoutConfig | null>(null);
+  const [campus, setCampus] = useState<CampusConfig | null>(null);
   const [forceOnboard, setForceOnboard] = useState(false);
 
   useEffect(() => {
-    setLayout(loadLayout());
+    setCampus(loadCampus());
     setReady(true);
   }, []);
+
+  const layout = useMemo(() => {
+    if (!campus) return loadLayout();
+    const active = getActiveUnit(campus);
+    if (!active) return null;
+    return unitToLayoutConfig(campus, active.floor, active.unit);
+  }, [campus]);
 
   if (!ready) {
     return (
@@ -60,41 +77,30 @@ export function DashboardApp() {
     );
   }
 
-  if (!layout || forceOnboard) {
+  if (!campus || !layout || forceOnboard) {
     return (
       <OnboardingWizard
-        initial={forceOnboard ? layout : null}
+        initial={forceOnboard ? campus ?? layout : null}
         onComplete={async (config) => {
-          saveLayout(config);
-          window.localStorage.removeItem(OPS_STORAGE_KEY);
+          saveCampus(config);
           try {
             await fetch("/api/tenant/snapshot", {
               method: "PUT",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                layout: {
-                  hospitalName: config.hospitalName,
-                  contactName: config.contactName,
-                  contactRole: config.contactRole,
-                  wardName: config.wardName,
-                  wardType: config.wardType,
-                  floorLabel: config.floorLabel,
-                  layoutStyle: config.layoutStyle,
-                  trackAssets: config.trackAssets,
-                  calibration: config.calibration,
-                  zones: config.zones,
-                  staffRoster: config.staffRoster,
-                },
-              }),
+              body: JSON.stringify({ campus: campusToApiPayload(config) }),
             });
           } catch {
-            /* local layout still saved */
+            /* local campus still saved */
           }
+          const first = getActiveUnit(config);
+          const activeLayout = first
+            ? unitToLayoutConfig(config, first.floor, first.unit)
+            : null;
           logTrainingEvent({
             ward: {
               hospital: config.hospitalName,
-              ward: config.wardName,
-              floor: config.floorLabel,
+              ward: activeLayout?.wardName ?? "",
+              floor: activeLayout?.floorLabel ?? "",
               layoutFingerprint: "",
               updatedAt: new Date().toISOString(),
               rooms: [],
@@ -105,17 +111,17 @@ export function DashboardApp() {
               metrics: [],
             },
             actorRole: "ops",
-            action: "layout.saved",
+            action: "campus.saved",
             entityType: "system",
-            entityId: "layout",
-            entityLabel: config.wardName,
+            entityId: "campus",
+            entityLabel: config.hospitalName,
             after: {
-              zones: config.zones.length,
-              beds: config.zones.reduce((n, z) => n + z.bedCount, 0),
+              floors: config.floors.length,
+              units: allUnits(config).length,
               roster: config.staffRoster.filter((s) => s.name.trim()).length,
             },
           });
-          setLayout(config);
+          setCampus(config);
           setForceOnboard(false);
         }}
       />
@@ -123,15 +129,24 @@ export function DashboardApp() {
   }
 
   return (
-    <CommandCenter layout={layout} onRemap={() => setForceOnboard(true)} />
+    <CommandCenter
+      campus={campus}
+      layout={layout}
+      onCampusChange={setCampus}
+      onRemap={() => setForceOnboard(true)}
+    />
   );
 }
 
 function CommandCenter({
+  campus,
   layout,
+  onCampusChange,
   onRemap,
 }: {
+  campus: CampusConfig;
   layout: LayoutConfig;
+  onCampusChange: (campus: CampusConfig) => void;
   onRemap: () => void;
 }) {
   const [role, setRole] = useState<ViewerRole>("charge");
@@ -143,6 +158,14 @@ function CommandCenter({
   const [trackingLive, setTrackingLive] = useState(false);
   const [showTracking, setShowTracking] = useState(false);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const layoutId = layout.layoutId;
+
+  const switchUnit = (floorId: string, unitId: string) => {
+    const next = setActiveUnit(campus, floorId, unitId);
+    saveCampus(next);
+    onCampusChange(next);
+    setFocus({ type: "none" });
+  };
 
   useEffect(() => {
     const loaded = loadOps(layout);
@@ -158,7 +181,6 @@ function CommandCenter({
     });
   }, [layout]);
 
-  // Cross-tab / hospital-ops sync → refresh ward snapshot
   useEffect(() => {
     return subscribeHospitalTenant(() => {
       setWard(loadOps(layout));
@@ -169,18 +191,18 @@ function CommandCenter({
     const onOps = () => setWard(loadOps(layout));
     window.addEventListener("doqto-ops-updated", onOps);
     const onStorage = (e: StorageEvent) => {
-      if (e.key === OPS_STORAGE_KEY) onOps();
+      if (e.key === opsStorageKey(layoutId) || e.key === OPS_STORAGE_KEY) onOps();
     };
     window.addEventListener("storage", onStorage);
     return () => {
       window.removeEventListener("doqto-ops-updated", onOps);
       window.removeEventListener("storage", onStorage);
     };
-  }, [layout]);
+  }, [layout, layoutId]);
 
   const persistWard = (next: WardSnapshot) => {
     if (saveTimer.current) clearTimeout(saveTimer.current);
-    saveTimer.current = setTimeout(() => saveOps(next), 300);
+    saveTimer.current = setTimeout(() => saveOps(next, layoutId), 300);
   };
 
   const apply = (updater: (prev: WardSnapshot) => WardSnapshot) => {
@@ -301,7 +323,7 @@ function CommandCenter({
   const publishAlert = (next: WardSnapshot, code?: Parameters<typeof publishWardAlertToHospital>[3]) => {
     const alert = next.alerts[0];
     if (!alert) {
-      saveOps(next);
+      saveOps(next, layoutId);
       setWard(next);
       return next;
     }
@@ -317,7 +339,7 @@ function CommandCenter({
           ),
         }
       : next;
-    saveOps(stamped);
+    saveOps(stamped, layoutId);
     setWard(stamped);
     return stamped;
   };
@@ -345,6 +367,14 @@ function CommandCenter({
     setWard(next);
   };
 
+  const unitOptions = allUnits(campus).map(({ floor, unit }) => ({
+    floorId: floor.id,
+    unitId: unit.id,
+    label: `${unit.wardName} · ${floor.label}`,
+    active:
+      campus.activeFloorId === floor.id && campus.activeUnitId === unit.id,
+  }));
+
   return (
     <div className="ops-shell flex min-h-dvh flex-col">
       <OpsHeader
@@ -370,6 +400,8 @@ function CommandCenter({
         trackingLive={trackingLive}
         lastUpdateLabel={lastUpdateLabel}
         onRemap={onRemap}
+        unitOptions={unitOptions}
+        onUnitChange={switchUnit}
       />
 
       <main className="mx-auto flex w-full max-w-[1680px] flex-1 flex-col gap-3 p-3 md:p-4">

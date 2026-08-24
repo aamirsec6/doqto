@@ -135,12 +135,33 @@ export class MessageRepository {
 export class LayoutRepository {
   constructor(private db: Db) {}
 
-  get(tenantId: string) {
-    return this.db.wardLayout.findUnique({ where: { tenantId } });
+  getById(layoutId: string) {
+    return this.db.wardLayout.findUnique({
+      where: { id: layoutId },
+      include: { floor: true },
+    });
   }
 
-  upsert(
+  listForTenant(tenantId: string) {
+    return this.db.wardLayout.findMany({
+      where: { tenantId },
+      include: { floor: true },
+      orderBy: [{ floor: { sortOrder: "asc" } }, { wardName: "asc" }],
+    });
+  }
+
+  /** @deprecated use getById */
+  get(tenantId: string) {
+    return this.db.wardLayout.findFirst({
+      where: { tenantId },
+      include: { floor: true },
+    });
+  }
+
+  upsertForFloor(
     tenantId: string,
+    floorId: string,
+    layoutId: string | undefined,
     data: {
       hospitalName: string;
       contactName: string;
@@ -155,40 +176,44 @@ export class LayoutRepository {
       mapVersion?: number;
     },
   ) {
-    return this.db.wardLayout.upsert({
-      where: { tenantId },
-      create: {
+    const payload = {
+      hospitalName: data.hospitalName,
+      contactName: data.contactName,
+      contactRole: data.contactRole,
+      wardName: data.wardName,
+      wardType: data.wardType,
+      floorLabel: data.floorLabel,
+      layoutStyle: data.layoutStyle,
+      trackAssets: data.trackAssets,
+      zonesJson: data.zonesJson as Prisma.InputJsonValue,
+      calibrationJson: data.calibrationJson as Prisma.InputJsonValue | undefined,
+      mapVersion: data.mapVersion ?? 2,
+    };
+
+    if (layoutId) {
+      return this.db.wardLayout.upsert({
+        where: { id: layoutId },
+        create: {
+          id: layoutId,
+          tenantId,
+          floorId,
+          ...payload,
+        },
+        update: payload,
+      });
+    }
+    return this.db.wardLayout.create({
+      data: {
         tenantId,
-        hospitalName: data.hospitalName,
-        contactName: data.contactName,
-        contactRole: data.contactRole,
-        wardName: data.wardName,
-        wardType: data.wardType,
-        floorLabel: data.floorLabel,
-        layoutStyle: data.layoutStyle,
-        trackAssets: data.trackAssets,
-        zonesJson: data.zonesJson as Prisma.InputJsonValue,
-        calibrationJson: data.calibrationJson as Prisma.InputJsonValue | undefined,
-        mapVersion: data.mapVersion ?? 2,
-      },
-      update: {
-        hospitalName: data.hospitalName,
-        contactName: data.contactName,
-        contactRole: data.contactRole,
-        wardName: data.wardName,
-        wardType: data.wardType,
-        floorLabel: data.floorLabel,
-        layoutStyle: data.layoutStyle,
-        trackAssets: data.trackAssets,
-        zonesJson: data.zonesJson as Prisma.InputJsonValue,
-        calibrationJson: data.calibrationJson as Prisma.InputJsonValue | undefined,
-        mapVersion: data.mapVersion ?? 2,
+        floorId,
+        ...payload,
       },
     });
   }
 
   async replaceRooms(
     tenantId: string,
+    layoutId: string,
     rooms: {
       key: string;
       label: string;
@@ -198,11 +223,12 @@ export class LayoutRepository {
       verticesJson?: unknown | null;
     }[],
   ) {
-    await this.db.room.deleteMany({ where: { tenantId } });
+    await this.db.room.deleteMany({ where: { layoutId } });
     if (rooms.length) {
       await this.db.room.createMany({
         data: rooms.map((r) => ({
           tenantId,
+          layoutId,
           key: r.key,
           label: r.label,
           kind: r.kind,
@@ -214,8 +240,24 @@ export class LayoutRepository {
     }
   }
 
-  listRooms(tenantId: string) {
+  listRooms(layoutId: string) {
+    return this.db.room.findMany({
+      where: { layoutId },
+      orderBy: { label: "asc" },
+    });
+  }
+
+  listRoomsForTenant(tenantId: string) {
     return this.db.room.findMany({ where: { tenantId }, orderBy: { label: "asc" } });
+  }
+
+  deleteLayoutsExcept(tenantId: string, keepIds: string[]) {
+    return this.db.wardLayout.deleteMany({
+      where: {
+        tenantId,
+        id: keepIds.length ? { notIn: keepIds } : undefined,
+      },
+    });
   }
 }
 
