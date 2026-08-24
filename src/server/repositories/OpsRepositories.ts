@@ -151,6 +151,8 @@ export class LayoutRepository {
       layoutStyle: string;
       trackAssets: boolean;
       zonesJson: unknown;
+      calibrationJson?: unknown | null;
+      mapVersion?: number;
     },
   ) {
     return this.db.wardLayout.upsert({
@@ -166,6 +168,8 @@ export class LayoutRepository {
         layoutStyle: data.layoutStyle,
         trackAssets: data.trackAssets,
         zonesJson: data.zonesJson as Prisma.InputJsonValue,
+        calibrationJson: data.calibrationJson as Prisma.InputJsonValue | undefined,
+        mapVersion: data.mapVersion ?? 2,
       },
       update: {
         hospitalName: data.hospitalName,
@@ -177,18 +181,35 @@ export class LayoutRepository {
         layoutStyle: data.layoutStyle,
         trackAssets: data.trackAssets,
         zonesJson: data.zonesJson as Prisma.InputJsonValue,
+        calibrationJson: data.calibrationJson as Prisma.InputJsonValue | undefined,
+        mapVersion: data.mapVersion ?? 2,
       },
     });
   }
 
   async replaceRooms(
     tenantId: string,
-    rooms: { key: string; label: string; kind: string; path: string }[],
+    rooms: {
+      key: string;
+      label: string;
+      kind: string;
+      path: string;
+      parentKey?: string | null;
+      verticesJson?: unknown | null;
+    }[],
   ) {
     await this.db.room.deleteMany({ where: { tenantId } });
     if (rooms.length) {
       await this.db.room.createMany({
-        data: rooms.map((r) => ({ ...r, tenantId })),
+        data: rooms.map((r) => ({
+          tenantId,
+          key: r.key,
+          label: r.label,
+          kind: r.kind,
+          path: r.path,
+          parentKey: r.parentKey ?? null,
+          verticesJson: r.verticesJson as Prisma.InputJsonValue | undefined,
+        })),
       });
     }
   }

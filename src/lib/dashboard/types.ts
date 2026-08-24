@@ -20,11 +20,30 @@ export type WardType =
   | "general"
   | "ot"
   | "maternity"
+  | "opd"
   | "other";
 
-export type LayoutStyle = "bays" | "rooms" | "mixed";
+export type LayoutStyle = "bays" | "rooms" | "mixed" | "opd";
 
-export type ZoneKind = "clinical" | "nursing" | "store" | "other";
+export type ZoneKind =
+  | "clinical"
+  | "nursing"
+  | "store"
+  | "other"
+  | "opd"
+  | "opd_registration"
+  | "opd_waiting"
+  | "opd_triage"
+  | "opd_consultation";
+
+export interface MapCalibration {
+  pixelsPerMetre: number;
+  reference?: {
+    a: Point;
+    b: Point;
+    distanceMetres: number;
+  };
+}
 
 export interface Point {
   x: number;
@@ -103,6 +122,9 @@ export interface Room {
   label: string;
   kind: ZoneKind;
   path: string;
+  parentId?: string;
+  /** Polygon vertices in real-world metres (when calibrated). */
+  verticesM?: Point[];
 }
 
 export interface MetricPoint {
@@ -132,6 +154,9 @@ export interface LayoutZone {
   label: string;
   kind: ZoneKind;
   bedCount: number;
+  parentId?: string;
+  /** Polygon vertices in real-world metres. */
+  verticesM?: Point[];
 }
 
 export interface StaffRosterEntry {
@@ -141,7 +166,7 @@ export interface StaffRosterEntry {
 }
 
 export interface LayoutConfig {
-  version: 1;
+  version: 1 | 2;
   hospitalName: string;
   contactName: string;
   contactRole: string;
@@ -153,4 +178,5 @@ export interface LayoutConfig {
   trackAssets: boolean;
   staffRoster: StaffRosterEntry[];
   createdAt: string;
+  calibration?: MapCalibration;
 }

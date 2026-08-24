@@ -6,6 +6,9 @@ import {
   StaffRepository,
 } from "@/server/repositories/OpsRepositories";
 
+import { verticesToSvgPath, defaultPixelsPerMetre } from "@/lib/map/geometry";
+import type { Point } from "@/lib/dashboard/types";
+
 /** Shape matching client LayoutConfig for import/save. */
 export interface LayoutPayload {
   hospitalName: string;
@@ -16,7 +19,15 @@ export interface LayoutPayload {
   floorLabel: string;
   layoutStyle: string;
   trackAssets: boolean;
-  zones: { id: string; label: string; kind: string; bedCount: number }[];
+  calibration?: { pixelsPerMetre: number; reference?: unknown };
+  zones: {
+    id: string;
+    label: string;
+    kind: string;
+    bedCount: number;
+    parentId?: string;
+    verticesM?: Point[];
+  }[];
   staffRoster: { id: string; name: string; role: string }[];
 }
 
@@ -84,7 +95,13 @@ export class TenantDataService {
         layoutStyle: input.layout.layoutStyle,
         trackAssets: input.layout.trackAssets,
         zonesJson: input.layout.zones,
+        calibrationJson: input.layout.calibration ?? null,
+        mapVersion: 2,
       });
+
+      const ppm = defaultPixelsPerMetre(
+        input.layout.calibration as { pixelsPerMetre: number } | undefined,
+      );
 
       await layouts.replaceRooms(
         input.tenantId,
@@ -92,7 +109,12 @@ export class TenantDataService {
           key: z.id,
           label: z.label,
           kind: z.kind,
-          path: "",
+          path:
+            z.verticesM && z.verticesM.length >= 3
+              ? verticesToSvgPath(z.verticesM, ppm)
+              : "",
+          parentKey: z.parentId ?? null,
+          verticesJson: z.verticesM ?? null,
         })),
       );
 
@@ -104,7 +126,9 @@ export class TenantDataService {
           name: s.name.trim(),
           role: s.role || "Staff",
           status: "free",
-          roomKey: input.layout.zones.find((z) => z.kind === "nursing")?.id ||
+          roomKey:
+            input.layout.zones.find((z) => z.kind === "nursing")?.id ||
+            input.layout.zones.find((z) => z.kind === "opd_registration")?.id ||
             input.layout.zones[0]?.id ||
             "",
         })),

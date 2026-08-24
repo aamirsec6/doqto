@@ -1,4 +1,5 @@
 import { roomCenter } from "./status";
+import { zoneDistanceMetres } from "@/lib/map/geometry";
 import type {
   Asset,
   NearestAssetHint,
@@ -22,6 +23,8 @@ export function zoneDistance(
   fromRoomId: string,
   toRoomId: string,
 ): number {
+  const metres = zoneDistanceMetres(ward.rooms, fromRoomId, toRoomId);
+  if (metres >= 0) return metres;
   if (fromRoomId === toRoomId) return 0;
   const a = zoneCenter(ward, fromRoomId);
   const b = zoneCenter(ward, toRoomId);

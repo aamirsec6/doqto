@@ -9,10 +9,13 @@ import {
   emptyLayoutDraft,
   saveLayout,
 } from "@/lib/dashboard/layout";
+import { defaultZonesForOpd } from "@/lib/map/opd-template";
+import { MapZoneEditor } from "@/components/dashboard/MapZoneEditor";
 import type {
   LayoutConfig,
   LayoutStyle,
   LayoutZone,
+  MapCalibration,
   StaffRosterEntry,
   WardType,
   ZoneKind,
@@ -24,6 +27,8 @@ const STEPS = [
   { id: "unit", title: "Which ward?", caption: "Hospital and unit names" },
   { id: "shape", title: "How is the floor laid out?", caption: "Pick the closest match" },
   { id: "zones", title: "Name the spaces", caption: "Use names staff already say" },
+  { id: "calibrate", title: "Set real-world scale", caption: "Mark a known wall length" },
+  { id: "map", title: "Draw zone boundaries", caption: "Trace rooms on the floor plan" },
   { id: "team", title: "Who is on duty?", caption: "Staff directory for this shift" },
   { id: "review", title: "Ready to go live?", caption: "Check once, then open the board" },
 ] as const;
@@ -34,10 +39,16 @@ const wardTypes: { id: WardType; label: string; hint: string }[] = [
   { id: "general", label: "General ward", hint: "Rooms or shared bays" },
   { id: "ot", label: "OT complex", hint: "Theatres & recovery" },
   { id: "maternity", label: "Maternity", hint: "Labour / postpartum" },
+  { id: "opd", label: "OPD", hint: "Outpatient · waiting-time alerts" },
   { id: "other", label: "Other", hint: "Custom unit" },
 ];
 
 const layoutStyles: { id: LayoutStyle; label: string; hint: string }[] = [
+  {
+    id: "opd",
+    label: "OPD department",
+    hint: "Registration, waiting, triage, consultation rooms",
+  },
   {
     id: "bays",
     label: "Open bays",
@@ -65,7 +76,7 @@ export function OnboardingWizard({ onComplete, initial }: Props) {
   const [draft, setDraft] = useState(() =>
     initial
       ? {
-          version: 1 as const,
+          version: 2 as const,
           hospitalName: initial.hospitalName,
           contactName: initial.contactName,
           contactRole: initial.contactRole,
@@ -75,6 +86,7 @@ export function OnboardingWizard({ onComplete, initial }: Props) {
           layoutStyle: initial.layoutStyle,
           zones: initial.zones,
           trackAssets: initial.trackAssets,
+          calibration: initial.calibration,
           staffRoster: initial.staffRoster?.length
             ? initial.staffRoster
             : [
@@ -101,6 +113,20 @@ export function OnboardingWizard({ onComplete, initial }: Props) {
     value: (typeof draft)[K],
   ) => {
     setDraft((prev) => ({ ...prev, [key]: value }));
+    setError("");
+  };
+
+  const setWardType = (wardType: WardType) => {
+    if (wardType === "opd") {
+      setDraft((prev) => ({
+        ...prev,
+        wardType,
+        layoutStyle: "opd",
+        zones: defaultZonesForOpd(),
+      }));
+    } else {
+      update("wardType", wardType);
+    }
     setError("");
   };
 
@@ -165,15 +191,27 @@ export function OnboardingWizard({ onComplete, initial }: Props) {
       if (!draft.floorLabel.trim()) return "Please enter the floor / block.";
     }
     if (step === 3) {
-      if (draft.zones.filter((z) => z.kind === "clinical").length === 0) {
-        return "Add at least one clinical bay or room.";
+      if (draft.layoutStyle === "opd") {
+        const opdSubs = draft.zones.filter((z) => z.kind !== "opd");
+        if (opdSubs.length < 2) {
+          return "OPD needs at least registration and waiting sub-zones.";
+        }
+      } else {
+        if (draft.zones.filter((z) => z.kind === "clinical").length === 0) {
+          return "Add at least one clinical bay or room.";
+        }
+        if (totalBeds < 1) return "Add at least one bed to a clinical zone.";
       }
-      if (totalBeds < 1) return "Add at least one bed to a clinical zone.";
       if (draft.zones.some((z) => !z.label.trim())) {
         return "Every zone needs a name staff will recognise.";
       }
     }
     if (step === 4) {
+      if (!draft.calibration?.pixelsPerMetre) {
+        return "Set the floor scale by marking a reference wall or use default scale.";
+      }
+    }
+    if (step === 6) {
       if (!draft.staffRoster.some((s) => s.name.trim())) {
         return "Add at least one on-duty team member.";
       }
@@ -204,6 +242,7 @@ export function OnboardingWizard({ onComplete, initial }: Props) {
     }
     const config: LayoutConfig = {
       ...draft,
+      version: 2,
       hospitalName: draft.hospitalName.trim(),
       contactName: draft.contactName.trim(),
       contactRole: draft.contactRole.trim(),
@@ -271,6 +310,7 @@ export function OnboardingWizard({ onComplete, initial }: Props) {
             <UnitStep
               draft={draft}
               onChange={update}
+              onWardType={setWardType}
               wardTypes={wardTypes}
             />
           )}
@@ -294,12 +334,34 @@ export function OnboardingWizard({ onComplete, initial }: Props) {
             />
           )}
           {step === 4 && (
+            <MapZoneEditor
+              mode="calibrate"
+              zones={draft.zones}
+              calibration={draft.calibration}
+              onCalibrationChange={(calibration: MapCalibration) =>
+                update("calibration", calibration)
+              }
+              onZonesChange={(zones) => update("zones", zones)}
+            />
+          )}
+          {step === 5 && (
+            <MapZoneEditor
+              mode="draw"
+              zones={draft.zones}
+              calibration={draft.calibration}
+              onCalibrationChange={(calibration: MapCalibration) =>
+                update("calibration", calibration)
+              }
+              onZonesChange={(zones) => update("zones", zones)}
+            />
+          )}
+          {step === 6 && (
             <TeamStep
               roster={draft.staffRoster}
               onChange={(roster) => update("staffRoster", roster)}
             />
           )}
-          {step === 5 && (
+          {step === 7 && (
             <ReviewStep draft={draft} totalBeds={totalBeds} />
           )}
 
@@ -435,6 +497,7 @@ function WelcomeStep({
 function UnitStep({
   draft,
   onChange,
+  onWardType,
   wardTypes,
 }: {
   draft: ReturnType<typeof emptyLayoutDraft>;
@@ -442,6 +505,7 @@ function UnitStep({
     key: K,
     value: ReturnType<typeof emptyLayoutDraft>[K],
   ) => void;
+  onWardType: (wardType: WardType) => void;
   wardTypes: { id: WardType; label: string; hint: string }[];
 }) {
   return (
@@ -478,7 +542,7 @@ function UnitStep({
             <button
               key={type.id}
               type="button"
-              onClick={() => onChange("wardType", type.id)}
+              onClick={() => onWardType(type.id)}
               className={`rounded-xl border px-4 py-3 text-left transition ${
                 draft.wardType === type.id
                   ? "border-red bg-red/5"
@@ -617,7 +681,11 @@ function ZonesStep({
               <button
                 type="button"
                 onClick={() => onRemove(zone.id)}
-                disabled={zones.length <= 2}
+                disabled={
+                  zones.length <= 2 ||
+                  zone.kind === "opd" ||
+                  (layoutStyle === "opd" && zone.kind.startsWith("opd_") && zones.filter((z) => z.kind.startsWith("opd_")).length <= 2)
+                }
                 className="rounded-lg px-3 py-3 text-xs font-medium text-text-muted transition hover:bg-white hover:text-red disabled:opacity-30"
               >
                 Remove
@@ -635,7 +703,16 @@ function ZonesStep({
         >
           + Add {layoutStyle === "rooms" ? "room" : "bay"}
         </button>
-        {!zones.some((z) => z.kind === "nursing") && (
+        {!zones.some((z) => z.kind === "opd_consultation") && layoutStyle === "opd" && (
+          <button
+            type="button"
+            onClick={() => onAdd("opd_consultation")}
+            className="rounded-xl border border-red/15 px-4 py-2 text-xs font-semibold text-text-muted transition hover:border-red hover:text-red"
+          >
+            + Consultation room
+          </button>
+        )}
+        {!zones.some((z) => z.kind === "nursing") && layoutStyle !== "opd" && (
           <button
             type="button"
             onClick={() => onAdd("nursing")}
@@ -799,6 +876,8 @@ function ReviewStep({
   totalBeds: number;
 }) {
   const clinical = draft.zones.filter((z) => z.kind === "clinical").length;
+  const opdZones = draft.zones.filter((z) => z.kind.startsWith("opd")).length;
+  const mapped = draft.zones.filter((z) => (z.verticesM?.length ?? 0) >= 3).length;
   const team = draft.staffRoster.filter((s) => s.name.trim());
   return (
     <div className="space-y-6">
@@ -813,8 +892,12 @@ function ReviewStep({
           ["Floor", draft.floorLabel],
           ["Set up by", `${draft.contactName} · ${draft.contactRole}`],
           ["Layout", draft.layoutStyle],
-          ["Clinical zones", String(clinical)],
+          draft.layoutStyle === "opd"
+            ? ["OPD sub-zones", String(opdZones)]
+            : ["Clinical zones", String(clinical)],
           ["Beds", String(totalBeds)],
+          ["Scale", draft.calibration?.pixelsPerMetre ? `${draft.calibration.pixelsPerMetre.toFixed(1)} px/m` : "Default"],
+          ["Mapped polygons", String(mapped)],
           ["Team on board", String(team.length)],
           ["Equipment layer", draft.trackAssets ? "On" : "Off"],
         ].map(([label, value]) => (

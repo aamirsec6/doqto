@@ -52,20 +52,24 @@ model WardLayout {
   floorLabel    String   @default("")
   layoutStyle   String   @default("bays")
   trackAssets   Boolean  @default(true)
-  zonesJson     Json
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  zonesJson        Json
+  calibrationJson  Json?
+  mapVersion       Int      @default(2)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 }
 
 model Room {
-  id       String @id @default(cuid())
-  tenantId String
-  key      String
-  label    String
-  kind     String @default("clinical")
-  path     String @default("")
+  id           String  @id @default(cuid())
+  tenantId     String
+  key          String
+  label        String
+  kind         String  @default("clinical")
+  path         String  @default("")
+  parentKey    String?
+  verticesJson Json?
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 

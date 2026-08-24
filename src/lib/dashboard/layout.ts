@@ -1,3 +1,6 @@
+import { layoutGeometry } from "@/lib/map/geometry";
+import { defaultZonesForOpd } from "@/lib/map/opd-template";
+import { roomCenter } from "./status";
 import type {
   Asset,
   Bed,
@@ -12,12 +15,15 @@ import type {
   ZoneKind,
 } from "./types";
 
-export const LAYOUT_STORAGE_KEY = "doqto.ward.layout.v1";
+export const LAYOUT_STORAGE_KEY = "doqto.ward.layout.v2";
 export const OPS_STORAGE_KEY = "doqto.ward.ops.v1";
+
+export { layoutGeometry } from "@/lib/map/geometry";
 
 export const defaultZonesForStyle = (
   style: LayoutConfig["layoutStyle"],
 ): LayoutZone[] => {
+  if (style === "opd") return defaultZonesForOpd();
   if (style === "rooms") {
     return [
       { id: "room-101", label: "Room 101", kind: "clinical", bedCount: 2 },
@@ -50,7 +56,7 @@ export const defaultZonesForStyle = (
 };
 
 export const emptyLayoutDraft = (): Omit<LayoutConfig, "createdAt"> => ({
-  version: 1,
+  version: 2,
   hospitalName: "",
   contactName: "",
   contactRole: "",
@@ -65,13 +71,22 @@ export const emptyLayoutDraft = (): Omit<LayoutConfig, "createdAt"> => ({
     { id: "roster-2", name: "", role: "Staff nurse" },
     { id: "roster-3", name: "", role: "Doctor" },
   ],
+  calibration: undefined,
 });
 
 export function layoutFingerprint(config: LayoutConfig): string {
   return JSON.stringify({
     ward: config.wardName,
     floor: config.floorLabel,
-    zones: config.zones.map((z) => [z.id, z.label, z.kind, z.bedCount]),
+    zones: config.zones.map((z) => [
+      z.id,
+      z.label,
+      z.kind,
+      z.bedCount,
+      z.verticesM,
+      z.parentId,
+    ]),
+    calibration: config.calibration?.pixelsPerMetre,
     trackAssets: config.trackAssets,
     roster: config.staffRoster.map((s) => [s.id, s.name, s.role]),
   });
@@ -80,10 +95,13 @@ export function layoutFingerprint(config: LayoutConfig): string {
 export function loadLayout(): LayoutConfig | null {
   if (typeof window === "undefined") return null;
   try {
-    const raw = window.localStorage.getItem(LAYOUT_STORAGE_KEY);
+    const raw =
+      window.localStorage.getItem(LAYOUT_STORAGE_KEY) ??
+      window.localStorage.getItem("doqto.ward.layout.v1");
     if (!raw) return null;
     const parsed = JSON.parse(raw) as LayoutConfig;
-    if (parsed?.version !== 1 || !parsed.zones?.length) return null;
+    if (!parsed?.zones?.length) return null;
+    if (parsed.version !== 1 && parsed.version !== 2) return null;
     if (!parsed.staffRoster) {
       parsed.staffRoster = [
         {
@@ -93,7 +111,7 @@ export function loadLayout(): LayoutConfig | null {
         },
       ];
     }
-    return parsed;
+    return { ...parsed, version: 2 };
   } catch {
     return null;
   }
@@ -105,69 +123,8 @@ export function saveLayout(config: LayoutConfig) {
 
 export function clearLayout() {
   window.localStorage.removeItem(LAYOUT_STORAGE_KEY);
+  window.localStorage.removeItem("doqto.ward.layout.v1");
   window.localStorage.removeItem(OPS_STORAGE_KEY);
-}
-
-function layoutGeometry(zones: LayoutZone[]): {
-  rooms: Room[];
-  centers: Record<string, Point>;
-} {
-  const clinical = zones.filter((z) => z.kind === "clinical");
-  const services = zones.filter((z) => z.kind !== "clinical");
-
-  const cols = clinical.length <= 2 ? clinical.length || 1 : 2;
-  const rows = Math.ceil(clinical.length / cols) || 1;
-
-  const pad = 28;
-  const gap = 16;
-  const clinicalW = 220;
-  const clinicalH = 170;
-  const serviceW = 180;
-  const mapH = Math.max(
-    pad * 2 + rows * clinicalH + (rows - 1) * gap,
-    pad * 2 + services.length * 100 + Math.max(0, services.length - 1) * gap,
-  );
-
-  const rooms: Room[] = [];
-  const centers: Record<string, Point> = {};
-
-  clinical.forEach((zone, i) => {
-    const col = i % cols;
-    const row = Math.floor(i / cols);
-    const x = pad + col * (clinicalW + gap);
-    const y = pad + row * (clinicalH + gap);
-    rooms.push({
-      id: zone.id,
-      label: zone.label,
-      kind: zone.kind,
-      path: `M ${x} ${y} H ${x + clinicalW} V ${y + clinicalH} H ${x} Z`,
-    });
-    centers[zone.id] = { x: x + clinicalW / 2, y: y + clinicalH / 2 };
-  });
-
-  const serviceX =
-    pad + cols * clinicalW + (cols > 0 ? (cols - 1) * gap : 0) + gap;
-  const serviceH = Math.max(
-    90,
-    (mapH - pad * 2 - Math.max(0, services.length - 1) * gap) /
-      Math.max(services.length, 1),
-  );
-
-  services.forEach((zone, i) => {
-    const y = pad + i * (serviceH + gap);
-    rooms.push({
-      id: zone.id,
-      label: zone.label,
-      kind: zone.kind,
-      path: `M ${serviceX} ${y} H ${serviceX + serviceW} V ${y + serviceH} H ${serviceX} Z`,
-    });
-    centers[zone.id] = {
-      x: serviceX + serviceW / 2,
-      y: y + serviceH / 2,
-    };
-  });
-
-  return { rooms, centers };
 }
 
 function bedPositions(
@@ -196,7 +153,7 @@ function offset(point: Point | undefined, dx: number, dy: number): Point {
 
 /** Fresh real ward: empty beds, roster staff on floor, no fake incidents. */
 export function buildWardFromLayout(config: LayoutConfig): WardSnapshot {
-  const { rooms, centers } = layoutGeometry(config.zones);
+  const { rooms, centers } = layoutGeometry(config.zones, config.calibration);
   const fingerprint = layoutFingerprint(config);
 
   const beds: Bed[] = [];
@@ -216,10 +173,16 @@ export function buildWardFromLayout(config: LayoutConfig): WardSnapshot {
 
   const nursingId =
     config.zones.find((z) => z.kind === "nursing")?.id ??
+    config.zones.find((z) => z.kind === "opd_registration")?.id ??
     config.zones[0]?.id ??
     "ward";
   const clinicalIds = config.zones
-    .filter((z) => z.kind === "clinical")
+    .filter(
+      (z) =>
+        z.kind === "clinical" ||
+        z.kind === "opd_consultation" ||
+        z.kind === "opd_triage",
+    )
     .map((z) => z.id);
   const storeId =
     config.zones.find((z) => z.kind === "store")?.id ?? nursingId;
@@ -338,9 +301,12 @@ export function mergeWardWithLayout(
 ): WardSnapshot {
   const fresh = buildWardFromLayout(config);
   if (!previous || previous.layoutFingerprint !== fresh.layoutFingerprint) {
-    // Still try to keep bed/staff status when IDs overlap after remaps
     if (!previous) return fresh;
   }
+
+  const centers = Object.fromEntries(
+    fresh.rooms.map((r) => [r.id, roomCenter(r.path)]),
+  ) as Record<string, Point>;
 
   const prevBeds = new Map(previous.beds.map((b) => [b.id, b]));
   const beds = fresh.beds.map((bed) => {
@@ -366,7 +332,6 @@ export function mergeWardWithLayout(
     };
   });
 
-  const { centers } = layoutGeometry(config.zones);
   const positionedStaff = staff.map((person, i) => ({
     ...person,
     position: offset(

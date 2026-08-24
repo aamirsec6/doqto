@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { OnboardingWizard } from "@/components/dashboard/OnboardingWizard";
 import { OpsHeader } from "@/components/dashboard/OpsHeader";
 import { TwinMap } from "@/components/dashboard/TwinMap";
@@ -81,6 +81,7 @@ export function DashboardApp() {
                   floorLabel: config.floorLabel,
                   layoutStyle: config.layoutStyle,
                   trackAssets: config.trackAssets,
+                  calibration: config.calibration,
                   zones: config.zones,
                   staffRoster: config.staffRoster,
                 },
@@ -141,11 +142,11 @@ function CommandCenter({
   const [ward, setWard] = useState<WardSnapshot | null>(null);
   const [trackingLive, setTrackingLive] = useState(false);
   const [showTracking, setShowTracking] = useState(false);
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     const loaded = loadOps(layout);
     setWard(loaded);
-    saveOps(loaded);
     ensureHospitalTenant(layout, loaded);
     logTrainingEvent({
       ward: loaded,
@@ -177,11 +178,16 @@ function CommandCenter({
     };
   }, [layout]);
 
+  const persistWard = (next: WardSnapshot) => {
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => saveOps(next), 300);
+  };
+
   const apply = (updater: (prev: WardSnapshot) => WardSnapshot) => {
     setWard((prev) => {
       if (!prev) return prev;
       const next = updater(prev);
-      saveOps(next);
+      persistWard(next);
       ensureHospitalTenant(layout, next);
       return next;
     });

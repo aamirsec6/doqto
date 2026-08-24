@@ -69,13 +69,19 @@ export const alertTone: Record<
   },
 };
 
-/** Parse SVG path M/H/V box and return center. */
+/** Parse SVG path and return center (rect or polygon). */
 export function roomCenter(path: string): { x: number; y: number } {
   const nums = path.match(/-?\d+(\.\d+)?/g)?.map(Number) ?? [];
   if (nums.length < 4) return { x: 0, y: 0 };
-  // Typical: M x y H x2 V y2 H x
-  const xs = nums.filter((_, i) => i % 2 === 0);
-  const ys = nums.filter((_, i) => i % 2 === 1);
+  const xs: number[] = [];
+  const ys: number[] = [];
+  for (let i = 0; i < nums.length; i += 2) {
+    if (nums[i] !== undefined && nums[i + 1] !== undefined) {
+      xs.push(nums[i]!);
+      ys.push(nums[i + 1]!);
+    }
+  }
+  if (!xs.length) return { x: 0, y: 0 };
   const minX = Math.min(...xs);
   const maxX = Math.max(...xs);
   const minY = Math.min(...ys);
