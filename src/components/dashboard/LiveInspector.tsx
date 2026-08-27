@@ -78,14 +78,35 @@ export function LiveInspector({
   };
 
   if (focus.type === "none") {
+    const bedsReady = ward.beds.filter((b) => b.status === "available").length;
+    const onFloor = ward.staff.filter((s) => s.status !== "off-floor").length;
     return (
-      <section className="ops-panel px-4 py-3">
-        <p className="text-[12px] text-[var(--ops-muted)]">
-          Select a <span className="text-sky-300">bed</span>,{" "}
-          <span className="text-sky-300">person</span>,{" "}
-          <span className="text-sky-300">asset</span>, or{" "}
-          <span className="text-sky-300">zone</span> — buttons update live
-          counts instantly.
+      <section className="ops-panel p-4">
+        <p className="text-[10px] font-semibold tracking-wider text-[var(--ops-muted)] uppercase">
+          Ward summary
+        </p>
+        <dl className="mt-2 grid grid-cols-2 gap-2 text-[12px]">
+          <div>
+            <dt className="text-[var(--ops-muted)]">Beds ready</dt>
+            <dd className="font-semibold text-emerald-300">{bedsReady}</dd>
+          </div>
+          <div>
+            <dt className="text-[var(--ops-muted)]">Staff on floor</dt>
+            <dd className="font-semibold text-[var(--ops-text)]">{onFloor}</dd>
+          </div>
+          <div>
+            <dt className="text-[var(--ops-muted)]">Zones</dt>
+            <dd className="font-semibold text-[var(--ops-text)]">{ward.rooms.length}</dd>
+          </div>
+          <div>
+            <dt className="text-[var(--ops-muted)]">Assets tracked</dt>
+            <dd className="font-semibold text-[var(--ops-text)]">{ward.assets.length}</dd>
+          </div>
+        </dl>
+        <p className="mt-3 text-[11px] text-[var(--ops-muted)]">
+          Tap a <span className="text-sky-300">zone</span>,{" "}
+          <span className="text-sky-300">bed</span>, or{" "}
+          <span className="text-sky-300">person</span> on the map to update live.
         </p>
       </section>
     );

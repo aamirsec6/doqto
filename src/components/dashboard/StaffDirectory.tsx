@@ -10,6 +10,9 @@ interface Props {
   focus: Focus;
   onFocusStaff: (id: string) => void;
   onSetStaffStatus: (id: string, status: StaffStatus) => void;
+  variant?: "full" | "compact";
+  collapsed?: boolean;
+  onToggleCollapse?: () => void;
 }
 
 type FilterId = "all" | RoleCategoryFilter;
@@ -27,6 +30,9 @@ export function StaffDirectory({
   focus,
   onFocusStaff,
   onSetStaffStatus,
+  variant = "full",
+  collapsed = false,
+  onToggleCollapse,
 }: Props) {
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<FilterId>("all");
@@ -63,82 +69,82 @@ export function StaffDirectory({
     return { free, responding, total: ward.staff.length };
   }, [ward.staff]);
 
+  const compact = variant === "compact";
+
   return (
-    <section className="ops-panel flex h-full min-h-[420px] flex-col overflow-hidden">
-      <div className="border-b border-white/5 px-4 py-3">
-        <div className="flex items-start justify-between gap-2">
+    <section
+      className={`ops-panel flex flex-col overflow-hidden ${
+        compact ? "max-h-[280px]" : "min-h-0 flex-1"
+      }`}
+    >
+      <div className="border-b border-white/5 px-3 py-2.5">
+        <div className="flex items-center justify-between gap-2">
           <div>
-            <p className="ops-panel-title">Staff directory</p>
-            <p className="mt-1 text-[11px] text-[var(--ops-muted)]">
-              {counts.total} on board · {counts.free} available ·{" "}
-              {counts.responding} responding
+            <p className="text-[10px] font-semibold tracking-wider text-[var(--ops-muted)] uppercase">
+              Staff
+            </p>
+            <p className="text-[11px] text-[var(--ops-muted)]">
+              {counts.free} free · {counts.responding} responding
             </p>
           </div>
-        </div>
-        <input
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search name, role, or zone"
-          className="mt-3 w-full rounded-md border border-white/10 bg-black/30 px-3 py-2 text-[12px] text-[var(--ops-text)] outline-none placeholder:text-[var(--ops-muted)] focus:border-white/25"
-        />
-        <div className="mt-2.5 flex flex-wrap gap-1.5">
-          <FilterChip
-            active={filter === "all"}
-            onClick={() => setFilter("all")}
-            label="All"
-          />
-          {ROLE_PRESETS.filter((r) => r.id !== "other").map((preset) => (
-            <FilterChip
-              key={preset.id}
-              active={filter === preset.id}
-              onClick={() => setFilter(preset.id)}
-              label={preset.short}
-              color={preset.color}
-            />
-          ))}
-        </div>
-        <div className="mt-2 flex flex-wrap gap-1.5">
-          {(
-            [
-              ["all", "Any status"],
-              ["free", "Available"],
-              ["busy", "Busy"],
-              ["responding", "Responding"],
-            ] as const
-          ).map(([id, label]) => (
+          {onToggleCollapse && (
             <button
-              key={id}
               type="button"
-              onClick={() => setStatusOnly(id)}
-              className={`rounded px-2 py-0.5 text-[10px] font-semibold ${
-                statusOnly === id
-                  ? "bg-white/10 text-[var(--ops-text)]"
-                  : "text-[var(--ops-muted)] hover:text-[var(--ops-text)]"
-              }`}
+              onClick={onToggleCollapse}
+              className="text-[10px] font-semibold text-[var(--ops-muted)] hover:text-[var(--ops-text)]"
             >
-              {label}
+              {collapsed ? "Show" : "Hide"}
             </button>
-          ))}
+          )}
         </div>
+        {!collapsed && !compact && (
+          <>
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search name, role, or zone"
+              className="mt-2 w-full rounded-md border border-white/10 bg-black/30 px-3 py-1.5 text-[12px] text-[var(--ops-text)] outline-none placeholder:text-[var(--ops-muted)] focus:border-white/25"
+            />
+            <div className="mt-2 flex flex-wrap gap-1">
+              <FilterChip
+                active={filter === "all"}
+                onClick={() => setFilter("all")}
+                label="All"
+              />
+              {ROLE_PRESETS.filter((r) => r.id !== "other").map((preset) => (
+                <FilterChip
+                  key={preset.id}
+                  active={filter === preset.id}
+                  onClick={() => setFilter(preset.id)}
+                  label={preset.short}
+                  color={preset.color}
+                />
+              ))}
+            </div>
+          </>
+        )}
       </div>
 
-      <ul className="min-h-0 flex-1 space-y-1 overflow-y-auto p-2">
-        {filtered.length === 0 && (
-          <li className="px-3 py-6 text-center text-[12px] text-[var(--ops-muted)]">
-            No staff match this filter.
-          </li>
-        )}
-        {filtered.map((person) => (
-          <DirectoryRow
-            key={person.id}
-            person={person}
-            zone={roomLabel(person.roomId)}
-            active={focus.type === "staff" && focus.id === person.id}
-            onFocus={() => onFocusStaff(person.id)}
-            onSetStatus={(status) => onSetStaffStatus(person.id, status)}
-          />
-        ))}
-      </ul>
+      {!collapsed && (
+        <ul className="min-h-0 flex-1 space-y-0.5 overflow-y-auto p-1.5">
+          {filtered.length === 0 && (
+            <li className="px-3 py-4 text-center text-[11px] text-[var(--ops-muted)]">
+              No staff match.
+            </li>
+          )}
+          {filtered.map((person) => (
+            <DirectoryRow
+              key={person.id}
+              person={person}
+              zone={roomLabel(person.roomId)}
+              active={focus.type === "staff" && focus.id === person.id}
+              onFocus={() => onFocusStaff(person.id)}
+              onSetStatus={(status) => onSetStaffStatus(person.id, status)}
+              compact={compact}
+            />
+          ))}
+        </ul>
+      )}
     </section>
   );
 }
@@ -178,42 +184,39 @@ function DirectoryRow({
   active,
   onFocus,
   onSetStatus,
+  compact = false,
 }: {
   person: StaffMember;
   zone: string;
   active: boolean;
   onFocus: () => void;
   onSetStatus: (status: StaffStatus) => void;
+  compact?: boolean;
 }) {
   const preset = resolveRoleCategory(person.role, person.name);
-  const age =
-    person.lastSeenMin === 0
-      ? "Just now"
-      : `${person.lastSeenMin}m ago`;
 
   return (
     <li
-      className={`rounded-md border px-2.5 py-2.5 transition ${
+      className={`rounded border px-2 py-1.5 transition ${
         active
           ? "border-white/25 bg-white/10"
           : "border-transparent hover:border-white/10 hover:bg-white/[0.04]"
       }`}
     >
-      <button type="button" onClick={onFocus} className="flex w-full gap-2.5 text-left">
+      <button type="button" onClick={onFocus} className="flex w-full gap-2 text-left">
         <span
-          className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[11px] font-bold text-white"
+          className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-bold text-white"
           style={{ backgroundColor: preset.color }}
-          title={preset.label}
         >
           {person.name.trim().charAt(0).toUpperCase() || "?"}
         </span>
         <div className="min-w-0 flex-1">
-          <div className="flex items-center justify-between gap-2">
-            <p className="truncate text-[13px] font-semibold text-[var(--ops-text)]">
+          <div className="flex items-center justify-between gap-1">
+            <p className="truncate text-[12px] font-semibold text-[var(--ops-text)]">
               {person.name}
             </p>
             <span
-              className={`shrink-0 text-[10px] font-semibold ${
+              className={`shrink-0 text-[9px] font-semibold ${
                 person.status === "responding"
                   ? "text-[#f04343]"
                   : person.status === "free"
@@ -226,31 +229,31 @@ function DirectoryRow({
               {staffLabel[person.status]}
             </span>
           </div>
-          <p className="mt-0.5 truncate text-[11px] text-[var(--ops-muted)]">
-            <span style={{ color: preset.text }}>{preset.short}</span>
-            {" · "}
-            {zone}
-            {" · "}
-            seen {age}
-          </p>
+          {!compact && (
+            <p className="truncate text-[10px] text-[var(--ops-muted)]">
+              {preset.short} · {zone}
+            </p>
+          )}
         </div>
       </button>
-      <div className="mt-2 flex flex-wrap gap-1 pl-10">
-        {(["free", "busy", "responding", "off-floor"] as const).map((status) => (
-          <button
-            key={status}
-            type="button"
-            onClick={() => onSetStatus(status)}
-            className={`rounded px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide ${
-              person.status === status
-                ? "bg-white/15 text-[var(--ops-text)]"
-                : "bg-black/25 text-[var(--ops-muted)] hover:text-[var(--ops-text)]"
-            }`}
-          >
-            {staffLabel[status]}
-          </button>
-        ))}
-      </div>
+      {!compact && (
+        <div className="mt-1.5 flex flex-wrap gap-1 pl-8">
+          {(["free", "busy", "responding", "off-floor"] as const).map((status) => (
+            <button
+              key={status}
+              type="button"
+              onClick={() => onSetStatus(status)}
+              className={`rounded px-1.5 py-0.5 text-[9px] font-semibold uppercase ${
+                person.status === status
+                  ? "bg-white/15 text-[var(--ops-text)]"
+                  : "bg-black/25 text-[var(--ops-muted)] hover:text-[var(--ops-text)]"
+              }`}
+            >
+              {staffLabel[status]}
+            </button>
+          ))}
+        </div>
+      )}
     </li>
   );
 }

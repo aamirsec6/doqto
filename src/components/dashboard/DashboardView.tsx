@@ -7,7 +7,7 @@ import { TwinMap } from "@/components/dashboard/TwinMap";
 import { OpsAlerts } from "@/components/dashboard/OpsAlerts";
 import { LiveInspector } from "@/components/dashboard/LiveInspector";
 import { StaffDirectory } from "@/components/dashboard/StaffDirectory";
-import { ActionStrip } from "@/components/dashboard/ActionStrip";
+import { KpiStrip } from "@/components/dashboard/KpiStrip";
 import { TrackingControl } from "@/components/dashboard/TrackingControl";
 import {
   allUnits,
@@ -157,6 +157,7 @@ function CommandCenter({
   const [ward, setWard] = useState<WardSnapshot | null>(null);
   const [trackingLive, setTrackingLive] = useState(false);
   const [showTracking, setShowTracking] = useState(false);
+  const [staffCollapsed, setStaffCollapsed] = useState(false);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const layoutId = layout.layoutId;
 
@@ -375,6 +376,9 @@ function CommandCenter({
       campus.activeFloorId === floor.id && campus.activeUnitId === unit.id,
   }));
 
+  const showStaffRail = role !== "nurse";
+  const staffVariant = role === "ops" ? "full" : "compact";
+
   return (
     <div className="ops-shell flex min-h-dvh flex-col">
       <OpsHeader
@@ -400,29 +404,51 @@ function CommandCenter({
         trackingLive={trackingLive}
         lastUpdateLabel={lastUpdateLabel}
         onRemap={onRemap}
+        onRaiseEmergency={raiseEmergencyOnFocusOrFirst}
         unitOptions={unitOptions}
         onUnitChange={switchUnit}
       />
 
-      <main className="mx-auto flex w-full max-w-[1680px] flex-1 flex-col gap-3 p-3 md:p-4">
-        <ActionStrip
-          ward={ward}
-          summary={summary}
-          now={now}
-          roomLabel={roomLabel}
-          onFocusAlert={(id) => setFocusLogged({ type: "alert", id })}
-          onAckAlert={ackAlert}
-          onRaiseEmergency={raiseEmergencyOnFocusOrFirst}
-        />
+      <KpiStrip
+        ward={ward}
+        summary={summary}
+        now={now}
+        roomLabel={roomLabel}
+        onFocusAlert={(id) => setFocusLogged({ type: "alert", id })}
+        onAckAlert={ackAlert}
+      />
 
-        <div className="grid min-h-0 flex-1 gap-3 lg:grid-cols-12">
-          <div className="flex min-h-[460px] flex-col gap-3 lg:col-span-8">
+      <main className="mx-auto flex w-full max-w-[1680px] flex-1 flex-col gap-2 p-2 md:p-3">
+        <div className="grid min-h-0 flex-1 gap-2 lg:grid-cols-12">
+          <div
+            className={`flex min-h-[min(72vh,640px)] flex-col ${
+              showStaffRail ? "lg:col-span-8" : "lg:col-span-12"
+            }`}
+          >
             <TwinMap
               ward={ward}
               focus={focus}
               onFocus={setFocusLogged}
               focusLabel={focusLabel}
             />
+          </div>
+
+          <div className="flex min-h-0 flex-col gap-2 lg:col-span-4">
+            {showStaffRail && (
+              <StaffDirectory
+                ward={ward}
+                focus={focus}
+                variant={staffVariant}
+                collapsed={staffCollapsed}
+                onToggleCollapse={() => setStaffCollapsed((v) => !v)}
+                onFocusStaff={(id) => setFocusLogged({ type: "staff", id })}
+                onSetStaffStatus={(id, status) =>
+                  apply((prev) =>
+                    setStaffStatus(prev, id, status, undefined, ctx),
+                  )
+                }
+              />
+            )}
             <LiveInspector
               ward={ward}
               focus={focus}
@@ -459,19 +485,6 @@ function CommandCenter({
               }}
             />
           </div>
-
-          <div className="lg:col-span-4">
-            <StaffDirectory
-              ward={ward}
-              focus={focus}
-              onFocusStaff={(id) => setFocusLogged({ type: "staff", id })}
-              onSetStaffStatus={(id, status) =>
-                apply((prev) =>
-                  setStaffStatus(prev, id, status, undefined, ctx),
-                )
-              }
-            />
-          </div>
         </div>
 
         <OpsAlerts
@@ -483,36 +496,35 @@ function CommandCenter({
           roomLabel={roomLabel}
         />
 
-        <div className="ops-panel">
-          <button
-            type="button"
-            onClick={() => setShowTracking((v) => !v)}
-            className="flex w-full items-center justify-between px-4 py-3 text-left"
-          >
-            <span>
-              <span className="ops-panel-title">Realtime tracking setup</span>
-              <span className="mt-1 block text-[11px] text-[var(--ops-muted)]">
-                Beacons, tags, and simulator for live location updates
+        {role === "ops" && (
+          <div className="ops-panel">
+            <button
+              type="button"
+              onClick={() => setShowTracking((v) => !v)}
+              className="flex w-full items-center justify-between px-4 py-2.5 text-left"
+            >
+              <span className="text-[11px] font-semibold text-[var(--ops-muted)]">
+                Realtime tracking setup
               </span>
-            </span>
-            <span className="text-[11px] font-semibold text-[var(--ops-muted)]">
-              {showTracking ? "Hide" : "Show"}
-            </span>
-          </button>
-          {showTracking && (
-            <div className="border-t border-white/5 px-2 pb-2">
-              <TrackingControl
-                rooms={ward.rooms.map((r) => ({ id: r.id, label: r.label }))}
-                staff={ward.staff.map((s) => ({ id: s.id, name: s.name }))}
-                assets={ward.assets.map((a) => ({ id: a.id, name: a.name }))}
-                onLocations={(locations: ResolvedLocation[]) => {
-                  setTrackingLive(true);
-                  apply((prev) => applyTrackingLocations(prev, locations));
-                }}
-              />
-            </div>
-          )}
-        </div>
+              <span className="text-[10px] text-[var(--ops-muted)]">
+                {showTracking ? "Hide" : "Show"}
+              </span>
+            </button>
+            {showTracking && (
+              <div className="border-t border-white/5 px-2 pb-2">
+                <TrackingControl
+                  rooms={ward.rooms.map((r) => ({ id: r.id, label: r.label }))}
+                  staff={ward.staff.map((s) => ({ id: s.id, name: s.name }))}
+                  assets={ward.assets.map((a) => ({ id: a.id, name: a.name }))}
+                  onLocations={(locations: ResolvedLocation[]) => {
+                    setTrackingLive(true);
+                    apply((prev) => applyTrackingLocations(prev, locations));
+                  }}
+                />
+              </div>
+            )}
+          </div>
+        )}
       </main>
     </div>
   );

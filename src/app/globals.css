@@ -162,6 +162,11 @@ body {
   color: var(--ops-muted);
 }
 
+.ops-kpi-strip {
+  background: var(--ops-panel);
+  border-bottom: 1px solid var(--ops-border);
+}
+
 @keyframes ops-live-pulse {
   0%,
   100% {

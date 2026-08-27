@@ -61,40 +61,43 @@ export function TwinMap({ ward, focus, onFocus, focusLabel }: Props) {
 
   const bedStyle = (status: string) => {
     if (status === "occupied")
-      return { fill: "#475569", stroke: "#94a3b8", label: "#e2e8f0" };
+      return { fill: "#1e3a5f", stroke: "#60a5fa", label: "#e2e8f0", dot: "#60a5fa" };
     if (status === "cleaning")
-      return { fill: "#3f3f46", stroke: "#a8a29e", label: "#d6d3d1" };
+      return { fill: "#3f3f46", stroke: "#fbbf24", label: "#fde68a", dot: "#fbbf24" };
     if (status === "reserved")
-      return { fill: "#334155", stroke: "#64748b", label: "#cbd5e1" };
-    return { fill: "rgba(15, 23, 42, 0.35)", stroke: "#64748b", label: "#94a3b8" };
+      return { fill: "#334155", stroke: "#a78bfa", label: "#ddd6fe", dot: "#a78bfa" };
+    return {
+      fill: "rgba(6, 78, 59, 0.35)",
+      stroke: "#34d399",
+      label: "#6ee7b7",
+      dot: "#34d399",
+    };
   };
 
   return (
-    <section className="ops-panel relative flex min-h-[420px] flex-1 flex-col overflow-hidden">
-      <div className="flex items-center justify-between gap-3 border-b border-white/5 px-4 py-3">
-        <div>
-          <p className="ops-panel-title">Live floor plan</p>
-          <p className="mt-0.5 text-[11px] text-[var(--ops-muted)]">
-            Realtime zones · tap a person, bed, or asset to act
-          </p>
-        </div>
-        <div className="hidden items-center gap-4 text-[10px] text-[var(--ops-muted)] sm:flex">
+    <section className="ops-panel relative flex min-h-[min(72vh,640px)] flex-1 flex-col overflow-hidden">
+      <div className="flex items-center justify-between gap-3 border-b border-white/5 px-4 py-2">
+        <p className="text-[10px] font-semibold tracking-wider text-[var(--ops-muted)] uppercase">
+          Live floor plan
+        </p>
+        <div className="flex items-center gap-3 text-[9px] text-[var(--ops-muted)]">
+          <LegendDot color="#34d399" label="Free bed" />
+          <LegendDot color="#60a5fa" label="Occupied" />
           {ROLE_PRESETS.filter((r) =>
-            ["physician", "nurse", "charge", "tech"].includes(r.id),
+            ["physician", "nurse", "charge"].includes(r.id),
           ).map((preset) => (
-            <span key={preset.id} className="flex items-center gap-1.5">
+            <span key={preset.id} className="hidden items-center gap-1 sm:flex">
               <span
-                className="h-2 w-2 rounded-full"
+                className="h-1.5 w-1.5 rounded-full"
                 style={{ background: preset.color }}
               />
               {preset.short}
             </span>
           ))}
-          <LegendDot color="#a33b3b" label="Responding" />
         </div>
       </div>
 
-      <div className="ops-floor-stage relative flex flex-1 items-center justify-center overflow-hidden p-4 md:p-6">
+      <div className="ops-floor-stage relative flex flex-1 items-center justify-center overflow-hidden p-3 md:p-5">
         <div className="relative w-full max-w-3xl">
           <svg
             viewBox={viewBox.attr}
@@ -192,6 +195,15 @@ export function TwinMap({ ward, focus, onFocus, focusLabel }: Props) {
                     stroke={selected ? "#cbd5e1" : style.stroke}
                     strokeWidth={selected ? 1.5 : 1}
                   />
+                  {bed.status === "available" && (
+                    <circle
+                      cx={bed.position.x + 14}
+                      cy={bed.position.y - 8}
+                      r={3}
+                      fill={style.dot}
+                      className="pointer-events-none"
+                    />
+                  )}
                   <text
                     x={bed.position.x}
                     y={bed.position.y + 1}
