@@ -12,6 +12,7 @@ model Tenant {
   name       String
   slug       String   @unique
   inviteCode String   @unique
+  department String   @default("oncology")
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
@@ -65,13 +66,15 @@ model WardLayout {
   contactName   String   @default("")
   contactRole   String   @default("")
   wardName      String
-  wardType      String   @default("icu")
+  wardType      String   @default("general")
+  unitKind      String   @default("ward")
   floorLabel    String   @default("")
   layoutStyle   String   @default("bays")
   trackAssets   Boolean  @default(true)
   zonesJson        Json
   calibrationJson  Json?
   mapVersion       Int      @default(2)
+  revision         Int      @default(0)
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
@@ -106,11 +109,13 @@ model Room {
 model StaffMember {
   id          String   @id @default(cuid())
   tenantId    String
+  layoutId    String?
   externalId  String
   name        String
   role        String
   status      String   @default("free")
   roomKey     String   @default("")
+  pinHash     String?
   lastSeenMin Int      @default(0)
   posX        Float    @default(0)
   posY        Float    @default(0)
@@ -121,11 +126,13 @@ model StaffMember {
   @@unique([tenantId, externalId])
   @@index([tenantId])
   @@index([tenantId, status])
+  @@index([layoutId])
 }
 
 model Bed {
   id              String  @id @default(cuid())
   tenantId        String
+  layoutId        String?
   externalId      String
   label           String
   roomKey         String
@@ -138,11 +145,13 @@ model Bed {
 
   @@unique([tenantId, externalId])
   @@index([tenantId])
+  @@index([layoutId])
 }
 
 model Asset {
   id          String @id @default(cuid())
   tenantId    String
+  layoutId    String?
   externalId  String
   name        String
   kind        String
@@ -156,6 +165,7 @@ model Asset {
 
   @@unique([tenantId, externalId])
   @@index([tenantId])
+  @@index([layoutId])
 }
 
 model Incident {
@@ -185,6 +195,7 @@ model Incident {
 model Alert {
   id                  String    @id @default(cuid())
   tenantId            String
+  layoutId            String?
   externalId          String
   severity            String
   kind                String
@@ -205,6 +216,7 @@ model Alert {
   @@unique([tenantId, externalId])
   @@index([tenantId])
   @@index([tenantId, lifecycle])
+  @@index([layoutId])
 }
 
 model Message {

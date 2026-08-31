@@ -37,7 +37,7 @@ const STEPS = [
   { id: "welcome", title: "Who are you?", caption: "Takes about 5–10 minutes" },
   { id: "hospital", title: "Your hospital", caption: "Name used across all floors" },
   { id: "floors", title: "Which floors?", caption: "Add every floor you want on the board" },
-  { id: "units", title: "Wards on each floor", caption: "Name each unit staff recognise" },
+  { id: "units", title: "Oncology units", caption: "Infusion, ward, and OPD on each floor" },
   { id: "shape", title: "How is this unit laid out?", caption: "Per unit · pick the closest match" },
   { id: "zones", title: "Name the spaces", caption: "Per unit · use names staff already say" },
   { id: "calibrate", title: "Set real-world scale", caption: "Per unit · mark a known wall length" },
@@ -49,15 +49,9 @@ const STEPS = [
 const CONFIGURE_START = 4;
 const CONFIGURE_END = 7;
 
-const wardTypes: { id: WardType; label: string; hint: string }[] = [
-  { id: "icu", label: "ICU / HDU", hint: "Critical care bays" },
-  { id: "emergency", label: "Emergency", hint: "Triage & resus" },
-  { id: "general", label: "General ward", hint: "Rooms or shared bays" },
-  { id: "ot", label: "OT complex", hint: "Theatres & recovery" },
-  { id: "maternity", label: "Maternity", hint: "Labour / postpartum" },
-  { id: "opd", label: "OPD", hint: "Outpatient · waiting-time alerts" },
-  { id: "other", label: "Other", hint: "Custom unit" },
-];
+import { ONCOLOGY_UNIT_KINDS } from "@/lib/oncology/constants";
+import { zonesForOncologyUnit } from "@/lib/oncology/templates";
+import type { OncologyUnitKind } from "@/lib/oncology/constants";
 
 const layoutStyles: { id: LayoutStyle; label: string; hint: string }[] = [
   {
@@ -136,16 +130,13 @@ export function OnboardingWizard({ onComplete, initial }: Props) {
     setError("");
   };
 
-  const setWardType = (wardType: WardType) => {
-    if (wardType === "opd") {
-      updateCurrentUnit({
-        wardType,
-        layoutStyle: "opd",
-        zones: defaultZonesForOpd(),
-      });
-    } else {
-      updateCurrentUnit({ wardType });
-    }
+  const setUnitKind = (unitKind: OncologyUnitKind) => {
+    updateCurrentUnit({
+      unitKind,
+      wardType: unitKind,
+      layoutStyle: unitKind === "opd" ? "opd" : unitKind === "ward" ? "rooms" : "bays",
+      zones: zonesForOncologyUnit(unitKind),
+    });
   };
 
   const setLayoutStyle = (style: LayoutStyle) => {
@@ -353,7 +344,6 @@ export function OnboardingWizard({ onComplete, initial }: Props) {
           {step === 3 && (
             <UnitsStep
               floors={draft.floors}
-              wardTypes={wardTypes}
               onChange={(floors) => updateCampus({ floors })}
             />
           )}
@@ -630,11 +620,9 @@ function FloorsStep({
 
 function UnitsStep({
   floors,
-  wardTypes: types,
   onChange,
 }: {
   floors: FloorConfig[];
-  wardTypes: { id: WardType; label: string; hint: string }[];
   onChange: (floors: FloorConfig[]) => void;
 }) {
   const updateUnit = (
@@ -713,22 +701,20 @@ function UnitsStep({
                     placeholder="Ward / unit name"
                   />
                   <div className="flex flex-wrap gap-2">
-                    {types.map((type) => (
+                    {ONCOLOGY_UNIT_KINDS.map((type) => (
                       <button
                         key={type.id}
                         type="button"
                         onClick={() => {
-                          const patch: Partial<UnitLayoutConfig> = {
+                          updateUnit(floor.id, unit.id, {
+                            unitKind: type.id,
                             wardType: type.id,
-                          };
-                          if (type.id === "opd") {
-                            patch.layoutStyle = "opd";
-                            patch.zones = defaultZonesForOpd();
-                          }
-                          updateUnit(floor.id, unit.id, patch);
+                            layoutStyle: type.layoutStyle,
+                            zones: zonesForOncologyUnit(type.id),
+                          });
                         }}
                         className={`rounded-lg border px-3 py-1.5 text-xs font-semibold transition ${
-                          unit.wardType === type.id
+                          unit.unitKind === type.id
                             ? "border-red bg-red/5 text-text"
                             : "border-red/10 text-text-muted hover:border-red/30"
                         }`}
@@ -1122,7 +1108,7 @@ function ReviewStep({ campus }: { campus: CampusConfig }) {
                   ).length;
                   return (
                     <li key={unit.id}>
-                      {unit.wardName} · {unit.wardType} · {beds} beds ·{" "}
+                      {unit.wardName} · {unit.unitKind} · {beds} beds ·{" "}
                       {mapped} mapped
                     </li>
                   );

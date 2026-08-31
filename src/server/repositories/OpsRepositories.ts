@@ -168,6 +168,7 @@ export class LayoutRepository {
       contactRole: string;
       wardName: string;
       wardType: string;
+      unitKind?: string;
       floorLabel: string;
       layoutStyle: string;
       trackAssets: boolean;
@@ -182,6 +183,7 @@ export class LayoutRepository {
       contactRole: data.contactRole,
       wardName: data.wardName,
       wardType: data.wardType,
+      unitKind: data.unitKind ?? data.wardType,
       floorLabel: data.floorLabel,
       layoutStyle: data.layoutStyle,
       trackAssets: data.trackAssets,

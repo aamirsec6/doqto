@@ -1,7 +1,9 @@
 import {
-  defaultZonesForStyle,
-  emptyLayoutDraft,
-} from "@/lib/dashboard/layout";
+  zonesForOncologyUnit,
+  defaultWardName,
+} from "@/lib/oncology/templates";
+import type { OncologyUnitKind } from "@/lib/oncology/constants";
+import { ONCOLOGY_UNIT_KINDS } from "@/lib/oncology/constants";
 import type {
   CampusConfig,
   FloorConfig,
@@ -17,25 +19,17 @@ export function newId(prefix: string) {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
-export function emptyFloor(label = "Ground", sortOrder = 0): FloorConfig {
+export function emptyFloor(label = "Level 1", sortOrder = 0): FloorConfig {
   const floorId = newId("floor");
-  const unitId = newId("unit");
+  const units: UnitLayoutConfig[] = ONCOLOGY_UNIT_KINDS.map((kind, i) =>
+    defaultUnitForFloor(floorId, kind.id, i + 1),
+  );
   return {
     id: floorId,
     label,
     building: "",
     sortOrder,
-    units: [
-      {
-        id: unitId,
-        floorId,
-        wardName: "",
-        wardType: "general",
-        layoutStyle: "bays",
-        zones: defaultZonesForStyle("bays"),
-        trackAssets: true,
-      },
-    ],
+    units,
   };
 }
 
@@ -102,6 +96,7 @@ export function layoutConfigToCampus(config: LayoutConfig): CampusConfig {
             id: unitId,
             floorId,
             wardName: config.wardName,
+            unitKind: (config.wardType as OncologyUnitKind) || "ward",
             wardType: config.wardType,
             layoutStyle: config.layoutStyle,
             zones: config.zones,
@@ -177,16 +172,19 @@ export function allUnits(campus: CampusConfig): {
 
 export function defaultUnitForFloor(
   floorId: string,
-  wardType: WardType = "general",
+  kind: OncologyUnitKind = "ward",
+  index = 1,
 ): UnitLayoutConfig {
+  const meta = ONCOLOGY_UNIT_KINDS.find((k) => k.id === kind)!;
   return {
     id: newId("unit"),
     floorId,
-    wardName: "",
-    wardType,
-    layoutStyle: wardType === "opd" ? "opd" : "bays",
-    zones: defaultZonesForStyle(wardType === "opd" ? "opd" : "bays"),
-    trackAssets: true,
+    wardName: defaultWardName(kind, index),
+    unitKind: kind,
+    wardType: kind,
+    layoutStyle: meta.layoutStyle,
+    zones: zonesForOncologyUnit(kind),
+    trackAssets: kind !== "opd",
   };
 }
 
@@ -205,7 +203,8 @@ export function campusToApiPayload(campus: CampusConfig) {
         id: unit.id,
         floorId: floor.id,
         wardName: unit.wardName,
-        wardType: unit.wardType,
+        wardType: unit.unitKind,
+        unitKind: unit.unitKind,
         layoutStyle: unit.layoutStyle,
         trackAssets: unit.trackAssets,
         calibration: unit.calibration,

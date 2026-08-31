@@ -1,3 +1,5 @@
+import type { OncologyUnitKind } from "@/lib/oncology/constants";
+
 export type StaffStatus = "free" | "busy" | "responding" | "off-floor";
 export type BedStatus = "available" | "occupied" | "cleaning" | "reserved";
 export type AssetStatus = "available" | "in-use" | "missing";
@@ -14,14 +16,7 @@ export type Focus =
   | { type: "alert"; id: string }
   | { type: "bed"; id: string };
 
-export type WardType =
-  | "icu"
-  | "emergency"
-  | "general"
-  | "ot"
-  | "maternity"
-  | "opd"
-  | "other";
+export type WardType = OncologyUnitKind | "general" | "other";
 
 export type LayoutStyle = "bays" | "rooms" | "mixed" | "opd";
 
@@ -189,6 +184,7 @@ export interface UnitLayoutConfig {
   id: string;
   floorId: string;
   wardName: string;
+  unitKind: OncologyUnitKind;
   wardType: WardType;
   layoutStyle: LayoutStyle;
   zones: LayoutZone[];

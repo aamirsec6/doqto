@@ -71,7 +71,7 @@ export const emptyLayoutDraft = (): Omit<LayoutConfig, "createdAt"> => ({
   contactName: "",
   contactRole: "",
   wardName: "",
-  wardType: "icu",
+  wardType: "ward",
   floorLabel: "",
   layoutStyle: "bays",
   zones: defaultZonesForStyle("bays"),

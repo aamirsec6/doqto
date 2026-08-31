@@ -4,6 +4,7 @@ export interface CampusUnitPayload {
   id?: string;
   floorId: string;
   wardName: string;
+  unitKind: string;
   wardType: string;
   layoutStyle: string;
   trackAssets: boolean;

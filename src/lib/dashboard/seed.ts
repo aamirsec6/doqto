@@ -348,7 +348,7 @@ export function buildSeedLayout(): LayoutConfig {
     contactName: "Nurse Fatima",
     contactRole: "Charge nurse",
     wardName: "ICU Ward 2",
-    wardType: "icu",
+    wardType: "ward",
     floorLabel: "Floor 3 · B Block",
     layoutStyle: "bays",
     zones: [

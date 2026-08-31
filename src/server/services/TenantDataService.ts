@@ -3,6 +3,7 @@ import type { ActorContext } from "@/server/domain/types";
 import type { CampusPayload, CampusUnitPayload } from "@/server/domain/campus";
 import { AuditRepository } from "@/server/repositories/AuditRepository";
 import { FloorRepository } from "@/server/repositories/FloorRepository";
+import { UnitBoardService } from "@/server/services/UnitBoardService";
 import {
   LayoutRepository,
   StaffRepository,
@@ -133,7 +134,8 @@ export class TenantDataService {
               contactName: input.campus.contactName,
               contactRole: input.campus.contactRole,
               wardName: unit.wardName,
-              wardType: unit.wardType,
+              wardType: unit.unitKind ?? unit.wardType ?? "ward",
+              unitKind: unit.unitKind ?? unit.wardType ?? "ward",
               floorLabel: floor.label,
               layoutStyle: unit.layoutStyle,
               trackAssets: unit.trackAssets,
@@ -187,6 +189,20 @@ export class TenantDataService {
         })),
       );
 
+      const primaryLayoutId = layoutIds[0];
+      if (primaryLayoutId && roster.length) {
+        await new UnitBoardService().syncStaffRoster(
+          input.tenantId,
+          primaryLayoutId,
+          roster,
+          defaultRoomKey,
+        );
+      }
+
+      for (const layoutId of layoutIds) {
+        await new UnitBoardService().ensureSeeded(input.tenantId, layoutId);
+      }
+
       await audits.append({
         tenantId: input.tenantId,
         actor: input.actor,
@@ -226,6 +242,7 @@ export class TenantDataService {
             {
               floorId: "legacy-floor",
               wardName: input.layout.wardName,
+              unitKind: input.layout.wardType,
               wardType: input.layout.wardType,
               layoutStyle: input.layout.layoutStyle,
               trackAssets: input.layout.trackAssets,

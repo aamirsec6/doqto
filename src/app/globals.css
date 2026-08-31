@@ -132,26 +132,27 @@ body {
   box-shadow: 0 20px 40px -12px rgba(204, 0, 0, 0.12);
 }
 
-/* Command-center live dashboard (inspired digital twin) */
+/* Oncology clinical dashboard — light theme */
 .ops-shell {
-  --ops-bg: #0b1220;
-  --ops-panel: #121a2b;
-  --ops-panel-2: #182234;
-  --ops-border: rgba(148, 163, 184, 0.14);
-  --ops-text: #e8eef8;
-  --ops-muted: #91a0b8;
-  --ops-cyan: #38bdf8;
-  --ops-green: #34d399;
-  --ops-amber: #fbbf24;
-  --ops-red: #f04343;
+  --ops-bg: #f4f6f9;
+  --ops-panel: #ffffff;
+  --ops-panel-2: #f8fafc;
+  --ops-border: #e2e8f0;
+  --ops-text: #0f172a;
+  --ops-muted: #64748b;
+  --ops-cyan: #0284c7;
+  --ops-green: #059669;
+  --ops-amber: #d97706;
+  --ops-red: #dc2626;
   background: var(--ops-bg);
   color: var(--ops-text);
 }
 
 .ops-panel {
-  background: #121a2b;
+  background: var(--ops-panel);
   border: 1px solid var(--ops-border);
-  border-radius: 6px;
+  border-radius: 8px;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
 }
 
 .ops-panel-title {
@@ -185,5 +186,5 @@ body {
 
 .ops-twin-stage,
 .ops-floor-stage {
-  background: #0c1220;
+  background: #eef2f7;
 }

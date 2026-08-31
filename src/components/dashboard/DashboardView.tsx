@@ -43,6 +43,8 @@ import {
 } from "@/lib/hospital/store";
 import { applyTrackingLocations } from "@/lib/tracking/apply";
 import type { ResolvedLocation } from "@/lib/tracking/types";
+import { StaffSignIn } from "@/components/dashboard/StaffSignIn";
+import { useUnitBoard } from "@/lib/dashboard/useUnitBoard";
 import { logTrainingEvent } from "@/lib/dashboard/training";
 import type {
   CampusConfig,
@@ -154,12 +156,23 @@ function CommandCenter({
   const [clock, setClock] = useState("");
   const [dateLabel, setDateLabel] = useState("");
   const [now, setNow] = useState(Date.now());
-  const [ward, setWard] = useState<WardSnapshot | null>(null);
+  const [fallbackWard, setFallbackWard] = useState<WardSnapshot | null>(null);
   const [trackingLive, setTrackingLive] = useState(false);
   const [showTracking, setShowTracking] = useState(false);
   const [staffCollapsed, setStaffCollapsed] = useState(false);
+  const [staffSignedIn, setStaffSignedIn] = useState(false);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const layoutId = layout.layoutId;
+
+  const {
+    ward: serverWard,
+    connection: boardConnection,
+    error: boardError,
+    patch: patchBoard,
+    refresh: refreshBoard,
+  } = useUnitBoard(layoutId);
+
+  const ward = serverWard ?? fallbackWard;
 
   const switchUnit = (floorId: string, unitId: string) => {
     const next = setActiveUnit(campus, floorId, unitId);
@@ -168,9 +181,15 @@ function CommandCenter({
     setFocus({ type: "none" });
   };
 
+  const ctx = { actorRole: role };
+
   useEffect(() => {
+    if (serverWard) {
+      ensureHospitalTenant(layout, serverWard);
+      return;
+    }
     const loaded = loadOps(layout);
-    setWard(loaded);
+    setFallbackWard(loaded);
     ensureHospitalTenant(layout, loaded);
     logTrainingEvent({
       ward: loaded,
@@ -180,40 +199,66 @@ function CommandCenter({
       entityId: "session",
       entityLabel: loaded.ward,
     });
-  }, [layout]);
+  }, [layout, serverWard]);
 
   useEffect(() => {
-    return subscribeHospitalTenant(() => {
-      setWard(loadOps(layout));
-    });
-  }, [layout]);
-
-  useEffect(() => {
-    const onOps = () => setWard(loadOps(layout));
-    window.addEventListener("doqto-ops-updated", onOps);
-    const onStorage = (e: StorageEvent) => {
-      if (e.key === opsStorageKey(layoutId) || e.key === OPS_STORAGE_KEY) onOps();
-    };
-    window.addEventListener("storage", onStorage);
-    return () => {
-      window.removeEventListener("doqto-ops-updated", onOps);
-      window.removeEventListener("storage", onStorage);
-    };
-  }, [layout, layoutId]);
-
-  const persistWard = (next: WardSnapshot) => {
-    if (saveTimer.current) clearTimeout(saveTimer.current);
-    saveTimer.current = setTimeout(() => saveOps(next, layoutId), 300);
-  };
+    if (!serverWard) return;
+    return subscribeHospitalTenant(() => void refreshBoard());
+  }, [layout, serverWard, refreshBoard]);
 
   const apply = (updater: (prev: WardSnapshot) => WardSnapshot) => {
-    setWard((prev) => {
-      if (!prev) return prev;
-      const next = updater(prev);
-      persistWard(next);
-      ensureHospitalTenant(layout, next);
-      return next;
-    });
+    if (!ward) return;
+    const next = updater(ward);
+    if (serverWard) {
+      setFallbackWard(next);
+    } else {
+      setFallbackWard(next);
+      if (saveTimer.current) clearTimeout(saveTimer.current);
+      saveTimer.current = setTimeout(() => saveOps(next, layoutId), 300);
+    }
+    ensureHospitalTenant(layout, next);
+  };
+
+  const applyBed = async (
+    bedId: string,
+    status: Parameters<typeof setBedStatus>[2],
+    initials?: string,
+  ) => {
+    if (layoutId && patchBoard) {
+      try {
+        await patchBoard({
+          action: "bed",
+          bedId,
+          status,
+          patientInitials: initials,
+        });
+      } catch {
+        apply((prev) => setBedStatus(prev, bedId, status, initials, ctx));
+      }
+      return;
+    }
+    apply((prev) => setBedStatus(prev, bedId, status, initials, ctx));
+  };
+
+  const applyStaff = async (
+    staffId: string,
+    status: Parameters<typeof setStaffStatus>[2],
+    roomId?: string,
+  ) => {
+    if (layoutId && patchBoard) {
+      try {
+        await patchBoard({
+          action: "staff",
+          staffId,
+          status,
+          roomKey: roomId,
+        });
+      } catch {
+        apply((prev) => setStaffStatus(prev, staffId, status, roomId, ctx));
+      }
+      return;
+    }
+    apply((prev) => setStaffStatus(prev, staffId, status, roomId, ctx));
   };
 
   const setFocusLogged = (next: Focus) => {
@@ -319,13 +364,11 @@ function CommandCenter({
     );
   }
 
-  const ctx = { actorRole: role };
-
   const publishAlert = (next: WardSnapshot, code?: Parameters<typeof publishWardAlertToHospital>[3]) => {
     const alert = next.alerts[0];
     if (!alert) {
       saveOps(next, layoutId);
-      setWard(next);
+      setFallbackWard(next);
       return next;
     }
     const tenant = publishWardAlertToHospital(layout, next, alert, code);
@@ -341,7 +384,8 @@ function CommandCenter({
         }
       : next;
     saveOps(stamped, layoutId);
-    setWard(stamped);
+    setFallbackWard(stamped);
+    void refreshBoard();
     return stamped;
   };
 
@@ -365,7 +409,8 @@ function CommandCenter({
 
   const ackAlert = (id: string) => {
     const { ward: next } = acknowledgeFromWard(layout, ward, id, role);
-    setWard(next);
+    setFallbackWard(next);
+    saveOps(next, layoutId);
   };
 
   const unitOptions = allUnits(campus).map(({ floor, unit }) => ({
@@ -401,13 +446,30 @@ function CommandCenter({
         }}
         clock={clock}
         dateLabel={dateLabel}
-        trackingLive={trackingLive}
+        trackingLive={boardConnection === "live" || trackingLive}
         lastUpdateLabel={lastUpdateLabel}
         onRemap={onRemap}
         onRaiseEmergency={raiseEmergencyOnFocusOrFirst}
         unitOptions={unitOptions}
         onUnitChange={switchUnit}
       />
+
+      {!staffSignedIn && (
+        <StaffSignIn onSignedIn={() => setStaffSignedIn(true)} />
+      )}
+
+      {boardError && (
+        <div className="border-b border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-900">
+          {boardError} — showing last known data.{" "}
+          <button
+            type="button"
+            onClick={() => void refreshBoard()}
+            className="font-semibold underline"
+          >
+            Retry
+          </button>
+        </div>
+      )}
 
       <KpiStrip
         ward={ward}
@@ -441,12 +503,8 @@ function CommandCenter({
                 variant={staffVariant}
                 collapsed={staffCollapsed}
                 onToggleCollapse={() => setStaffCollapsed((v) => !v)}
+                onSetStaffStatus={(id, status) => void applyStaff(id, status)}
                 onFocusStaff={(id) => setFocusLogged({ type: "staff", id })}
-                onSetStaffStatus={(id, status) =>
-                  apply((prev) =>
-                    setStaffStatus(prev, id, status, undefined, ctx),
-                  )
-                }
               />
             )}
             <LiveInspector
@@ -456,13 +514,9 @@ function CommandCenter({
               onClear={() => setFocus({ type: "none" })}
               actions={{
                 onSetBed: (bedId, status, initials) =>
-                  apply((prev) =>
-                    setBedStatus(prev, bedId, status, initials, ctx),
-                  ),
+                  void applyBed(bedId, status, initials),
                 onSetStaff: (staffId, status, roomId) =>
-                  apply((prev) =>
-                    setStaffStatus(prev, staffId, status, roomId, ctx),
-                  ),
+                  void applyStaff(staffId, status, roomId),
                 onSetAsset: (assetId, status, roomId) =>
                   apply((prev) =>
                     setAssetStatus(prev, assetId, status, roomId, ctx),
