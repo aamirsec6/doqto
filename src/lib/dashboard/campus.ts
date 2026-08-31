@@ -8,9 +8,12 @@ import type {
   CampusConfig,
   FloorConfig,
   LayoutConfig,
+  MapCalibration,
   UnitLayoutConfig,
   WardType,
 } from "@/lib/dashboard/types";
+
+const DEFAULT_CALIBRATION: MapCalibration = { pixelsPerMetre: 40 };
 
 export const CAMPUS_STORAGE_KEY = "doqto.campus.v3";
 export const ACTIVE_UNIT_KEY = "doqto.campus.active.v1";
@@ -185,6 +188,7 @@ export function defaultUnitForFloor(
     layoutStyle: meta.layoutStyle,
     zones: zonesForOncologyUnit(kind),
     trackAssets: kind !== "opd",
+    calibration: DEFAULT_CALIBRATION,
   };
 }
 
@@ -229,6 +233,7 @@ export function finalizeCampus(
       units: floor.units.map((unit) => ({
         ...unit,
         wardName: unit.wardName.trim(),
+        calibration: unit.calibration ?? DEFAULT_CALIBRATION,
         zones: unit.zones.map((z) => ({
           ...z,
           label: z.label.trim(),
