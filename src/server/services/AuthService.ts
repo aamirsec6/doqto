@@ -10,13 +10,8 @@ export class AuthService {
     adminEmail: string;
     adminPassword: string;
     adminName?: string;
-    bootstrapSecret: string;
     actor: ActorContext;
   }) {
-    const expected = process.env.DOQTO_BOOTSTRAP_SECRET || "doqto-bootstrap-pilot";
-    if (input.bootstrapSecret !== expected) {
-      throw new Error("Invalid bootstrap secret");
-    }
     if (input.adminPassword.length < 8) {
       throw new Error("Password must be at least 8 characters");
     }

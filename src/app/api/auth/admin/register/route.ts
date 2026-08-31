@@ -12,7 +12,6 @@ export async function POST(req: NextRequest) {
       adminEmail: String(body.adminEmail || ""),
       adminPassword: String(body.adminPassword || ""),
       adminName: body.adminName ? String(body.adminName) : undefined,
-      bootstrapSecret: String(body.bootstrapSecret || ""),
       actor: {
         type: "system",
         name: "bootstrap",

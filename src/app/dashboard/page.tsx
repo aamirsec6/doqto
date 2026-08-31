@@ -3,9 +3,8 @@ import { DashboardApp } from "@/components/dashboard/DashboardView";
 import { RequireTenant } from "@/components/tenant/RequireTenant";
 
 export const metadata: Metadata = {
-  title: "Digital twin · DOQTO",
-  description:
-    "Realtime ward digital twin — map your layout, then monitor beds, staff, assets, and alerts.",
+  title: "Oncology board · DOQTO",
+  description: "Live oncology department board — all units, staff, beds, and alerts.",
 };
 
 export default function DashboardPage() {

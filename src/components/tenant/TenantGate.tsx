@@ -15,7 +15,6 @@ export function TenantGate({ redirectTo = "/dashboard" }: { redirectTo?: string 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [hospitalName, setHospitalName] = useState("");
-  const [bootstrapSecret, setBootstrapSecret] = useState("");
   const [adminName, setAdminName] = useState("");
 
   async function submit(e: React.FormEvent) {
@@ -51,7 +50,6 @@ export function TenantGate({ redirectTo = "/dashboard" }: { redirectTo?: string 
             adminEmail: email,
             adminPassword: password,
             adminName,
-            bootstrapSecret,
           }),
         });
         const data = await res.json();
@@ -145,15 +143,6 @@ export function TenantGate({ redirectTo = "/dashboard" }: { redirectTo?: string 
                     value={adminName}
                     onChange={(e) => setAdminName(e.target.value)}
                     className="mt-1 w-full border border-white/10 bg-black/30 px-3 py-2 text-sm normal-case tracking-normal text-[var(--ops-text)]"
-                  />
-                </label>
-                <label className="block text-[11px] font-semibold tracking-wider text-[var(--ops-muted)] uppercase">
-                  Bootstrap secret
-                  <input
-                    value={bootstrapSecret}
-                    onChange={(e) => setBootstrapSecret(e.target.value)}
-                    className="mt-1 w-full border border-white/10 bg-black/30 px-3 py-2 text-sm normal-case tracking-normal text-[var(--ops-text)]"
-                    required
                   />
                 </label>
               </>
