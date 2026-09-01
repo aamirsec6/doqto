@@ -103,125 +103,138 @@ export class TenantDataService {
     campus: CampusPayload;
     actor: ActorContext;
   }) {
-    return prisma.$transaction(async (tx) => {
-      const floors = new FloorRepository(tx);
-      const layouts = new LayoutRepository(tx);
-      const staff = new StaffRepository(tx);
-      const audits = new AuditRepository(tx);
+    const { layoutIds, roster, defaultRoomKey, primaryLayoutId } =
+      await prisma.$transaction(
+        async (tx) => {
+          const floors = new FloorRepository(tx);
+          const layouts = new LayoutRepository(tx);
+          const staff = new StaffRepository(tx);
+          const audits = new AuditRepository(tx);
 
-      const floorIds: string[] = [];
-      const layoutIds: string[] = [];
+          const floorIds: string[] = [];
+          const layoutIds: string[] = [];
 
-      for (const [fi, floor] of input.campus.floors.entries()) {
-        const floorId = floor.id ?? `floor-${fi}`;
-        floorIds.push(floorId);
-        await floors.upsert(input.tenantId, floorId, {
-          label: floor.label,
-          building: floor.building ?? "",
-          sortOrder: floor.sortOrder ?? fi,
-        });
+          for (const [fi, floor] of input.campus.floors.entries()) {
+            const floorId = floor.id ?? `floor-${fi}`;
+            floorIds.push(floorId);
+            await floors.upsert(input.tenantId, floorId, {
+              label: floor.label,
+              building: floor.building ?? "",
+              sortOrder: floor.sortOrder ?? fi,
+            });
 
-        for (const unit of floor.units) {
-          const layoutId =
-            unit.id ?? `unit-${floorId}-${unit.wardName.replace(/\s+/g, "-").toLowerCase()}`;
-          layoutIds.push(layoutId);
-          const saved = await layouts.upsertForFloor(
+            for (const unit of floor.units) {
+              const layoutId =
+                unit.id ??
+                `unit-${floorId}-${unit.wardName.replace(/\s+/g, "-").toLowerCase()}`;
+              layoutIds.push(layoutId);
+              const saved = await layouts.upsertForFloor(
+                input.tenantId,
+                floorId,
+                layoutId,
+                {
+                  hospitalName: input.campus.hospitalName,
+                  contactName: input.campus.contactName,
+                  contactRole: input.campus.contactRole,
+                  wardName: unit.wardName,
+                  wardType: unit.unitKind ?? unit.wardType ?? "ward",
+                  unitKind: unit.unitKind ?? unit.wardType ?? "ward",
+                  floorLabel: floor.label,
+                  layoutStyle: unit.layoutStyle,
+                  trackAssets: unit.trackAssets,
+                  zonesJson: unit.zones,
+                  calibrationJson: unit.calibration ?? null,
+                  mapVersion: 2,
+                },
+              );
+
+              const ppm = defaultPixelsPerMetre(
+                unit.calibration as { pixelsPerMetre: number } | undefined,
+              );
+
+              await layouts.replaceRooms(
+                input.tenantId,
+                saved.id,
+                unit.zones.map((z) => ({
+                  key: z.id,
+                  label: z.label,
+                  kind: z.kind,
+                  path:
+                    z.verticesM && z.verticesM.length >= 3
+                      ? verticesToSvgPath(z.verticesM, ppm)
+                      : "",
+                  parentKey: z.parentId ?? null,
+                  verticesJson: z.verticesM ?? null,
+                })),
+              );
+            }
+          }
+
+          await layouts.deleteLayoutsExcept(input.tenantId, layoutIds);
+          await floors.deleteExcept(input.tenantId, floorIds);
+
+          const roster = input.campus.staffRoster.filter((s) => s.name.trim());
+          const firstUnit = input.campus.floors[0]?.units[0];
+          const defaultRoomKey =
+            firstUnit?.zones.find((z) => z.kind === "nursing")?.id ||
+            firstUnit?.zones.find((z) => z.kind === "opd_registration")?.id ||
+            firstUnit?.zones[0]?.id ||
+            "";
+
+          await staff.upsertMany(
             input.tenantId,
-            floorId,
-            layoutId,
-            {
-              hospitalName: input.campus.hospitalName,
-              contactName: input.campus.contactName,
-              contactRole: input.campus.contactRole,
-              wardName: unit.wardName,
-              wardType: unit.unitKind ?? unit.wardType ?? "ward",
-              unitKind: unit.unitKind ?? unit.wardType ?? "ward",
-              floorLabel: floor.label,
-              layoutStyle: unit.layoutStyle,
-              trackAssets: unit.trackAssets,
-              zonesJson: unit.zones,
-              calibrationJson: unit.calibration ?? null,
-              mapVersion: 2,
-            },
-          );
-
-          const ppm = defaultPixelsPerMetre(
-            unit.calibration as { pixelsPerMetre: number } | undefined,
-          );
-
-          await layouts.replaceRooms(
-            input.tenantId,
-            saved.id,
-            unit.zones.map((z) => ({
-              key: z.id,
-              label: z.label,
-              kind: z.kind,
-              path:
-                z.verticesM && z.verticesM.length >= 3
-                  ? verticesToSvgPath(z.verticesM, ppm)
-                  : "",
-              parentKey: z.parentId ?? null,
-              verticesJson: z.verticesM ?? null,
+            roster.map((s) => ({
+              externalId: s.id,
+              name: s.name.trim(),
+              role: s.role || "Staff",
+              status: "free",
+              roomKey: defaultRoomKey,
             })),
           );
-        }
-      }
 
-      await layouts.deleteLayoutsExcept(input.tenantId, layoutIds);
-      await floors.deleteExcept(input.tenantId, floorIds);
+          await audits.append({
+            tenantId: input.tenantId,
+            actor: input.actor,
+            action: "campus.save",
+            entityType: "campus",
+            entityId: input.tenantId,
+            entityLabel: input.campus.hospitalName,
+            after: {
+              floors: input.campus.floors.length,
+              units: layoutIds.length,
+              roster: roster.length,
+            },
+          });
 
-      const roster = input.campus.staffRoster.filter((s) => s.name.trim());
-      const firstUnit = input.campus.floors[0]?.units[0];
-      const defaultRoomKey =
-        firstUnit?.zones.find((z) => z.kind === "nursing")?.id ||
-        firstUnit?.zones.find((z) => z.kind === "opd_registration")?.id ||
-        firstUnit?.zones[0]?.id ||
-        "";
-
-      await staff.upsertMany(
-        input.tenantId,
-        roster.map((s) => ({
-          externalId: s.id,
-          name: s.name.trim(),
-          role: s.role || "Staff",
-          status: "free",
-          roomKey: defaultRoomKey,
-        })),
+          return {
+            layoutIds,
+            roster,
+            defaultRoomKey,
+            primaryLayoutId: layoutIds[0],
+          };
+        },
+        { timeout: 15_000 },
       );
 
-      const primaryLayoutId = layoutIds[0];
-      if (primaryLayoutId && roster.length) {
-        await new UnitBoardService().syncStaffRoster(
-          input.tenantId,
-          primaryLayoutId,
-          roster,
-          defaultRoomKey,
-        );
-      }
+    const board = new UnitBoardService();
+    if (primaryLayoutId && roster.length) {
+      await board.syncStaffRoster(
+        input.tenantId,
+        primaryLayoutId,
+        roster,
+        defaultRoomKey,
+      );
+    }
+    for (const layoutId of layoutIds) {
+      await board.ensureSeeded(input.tenantId, layoutId);
+    }
 
-      for (const layoutId of layoutIds) {
-        await new UnitBoardService().ensureSeeded(input.tenantId, layoutId);
-      }
-
-      await audits.append({
-        tenantId: input.tenantId,
-        actor: input.actor,
-        action: "campus.save",
-        entityType: "campus",
-        entityId: input.tenantId,
-        entityLabel: input.campus.hospitalName,
-        after: {
-          floors: input.campus.floors.length,
-          units: layoutIds.length,
-          roster: roster.length,
-        },
-      });
-
-      return {
-        floors: await floors.list(input.tenantId),
-        layouts: await layouts.listForTenant(input.tenantId),
-      };
-    });
+    const floors = new FloorRepository(prisma);
+    const layouts = new LayoutRepository(prisma);
+    return {
+      floors: await floors.list(input.tenantId),
+      layouts: await layouts.listForTenant(input.tenantId),
+    };
   }
 
   /** @deprecated use saveCampus */
