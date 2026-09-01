@@ -5,64 +5,43 @@ import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
 import {
-  allUnits,
   campusToApiPayload,
   defaultUnitForFloor,
   emptyCampusDraft,
   finalizeCampus,
-  layoutConfigToCampus,
   newId,
-  saveCampus,
-} from "@/lib/dashboard/campus";
+} from "@/board/campus";
 import type {
-  CampusConfig,
   FloorConfig,
-  LayoutConfig,
   StaffRosterEntry,
   UnitLayoutConfig,
 } from "@/lib/dashboard/types";
 import { ONCOLOGY_UNIT_KINDS } from "@/lib/oncology/constants";
-import { ROLE_PRESETS, resolveRoleCategory } from "@/lib/dashboard/roles";
 
 const STEPS = [
-  { title: "Who are you?", caption: "Quick setup · ~2 min" },
+  { title: "Who are you?", caption: "Quick setup" },
   { title: "Hospital", caption: "Oncology department" },
-  { title: "Units", caption: "Pick which units to run today" },
+  { title: "Units", caption: "Pick units for today" },
   { title: "Team", caption: "Staff on shift" },
 ] as const;
 
+const input =
+  "w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-red focus:bg-white";
+
 interface Props {
-  onComplete: (campus: CampusConfig) => void;
-  initial?: LayoutConfig | CampusConfig | null;
+  onComplete: () => void;
 }
 
-export { campusToApiPayload };
-
-export function OnboardingWizard({ onComplete, initial }: Props) {
+export function OnboardingFlow({ onComplete }: Props) {
   const [step, setStep] = useState(0);
-  const [draft, setDraft] = useState(() => {
-    if (initial && "floors" in initial && initial.version === 3) {
-      const { createdAt: _, ...rest } = initial;
-      return rest;
-    }
-    if (initial && "zones" in initial) {
-      const campus = layoutConfigToCampus(initial);
-      const { createdAt: _, ...rest } = campus;
-      return rest;
-    }
-    return emptyCampusDraft();
-  });
+  const [draft, setDraft] = useState(emptyCampusDraft);
   const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
 
   const floor = draft.floors[0];
   const progress = ((step + 1) / STEPS.length) * 100;
 
-  const updateCampus = (patch: Partial<typeof draft>) => {
-    setDraft((prev) => ({ ...prev, ...patch }));
-    setError("");
-  };
-
-  const validateStep = () => {
+  const validate = () => {
     if (step === 0) {
       if (!draft.contactName.trim()) return "Enter your name.";
       if (!draft.contactRole.trim()) return "Enter your role.";
@@ -80,8 +59,8 @@ export function OnboardingWizard({ onComplete, initial }: Props) {
     return "";
   };
 
-  const next = () => {
-    const message = validateStep();
+  const next = async () => {
+    const message = validate();
     if (message) {
       setError(message);
       return;
@@ -91,20 +70,32 @@ export function OnboardingWizard({ onComplete, initial }: Props) {
       setStep((s) => s + 1);
       return;
     }
-    const campus = finalizeCampus({
-      ...draft,
-      floors: draft.floors.map((f) => ({
-        ...f,
-        units: f.units.filter((u) => u.wardName.trim()),
-      })),
-    });
-    const first = allUnits(campus)[0];
-    if (first) {
-      campus.activeFloorId = first.floor.id;
-      campus.activeUnitId = first.unit.id;
+
+    setBusy(true);
+    try {
+      const campus = finalizeCampus({
+        ...draft,
+        floors: draft.floors.map((f) => ({
+          ...f,
+          units: f.units.filter((u) => u.wardName.trim()),
+        })),
+      });
+      const res = await fetch("/api/tenant/snapshot", {
+        method: "PUT",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ campus: campusToApiPayload(campus) }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "Could not save setup");
+      }
+      onComplete();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Save failed");
+    } finally {
+      setBusy(false);
     }
-    saveCampus(campus);
-    onComplete(campus);
   };
 
   return (
@@ -139,45 +130,69 @@ export function OnboardingWizard({ onComplete, initial }: Props) {
 
         <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
           {step === 0 && (
-            <WelcomeStep
-              contactName={draft.contactName}
-              contactRole={draft.contactRole}
-              onChange={(p) => updateCampus(p)}
-            />
+            <div className="space-y-4">
+              <Field label="Your name">
+                <input
+                  className={input}
+                  value={draft.contactName}
+                  onChange={(e) =>
+                    setDraft((d) => ({ ...d, contactName: e.target.value }))
+                  }
+                  autoFocus
+                />
+              </Field>
+              <Field label="Your role">
+                <input
+                  className={input}
+                  value={draft.contactRole}
+                  onChange={(e) =>
+                    setDraft((d) => ({ ...d, contactRole: e.target.value }))
+                  }
+                  placeholder="Charge nurse"
+                />
+              </Field>
+            </div>
           )}
           {step === 1 && (
-            <HospitalStep
-              value={draft.hospitalName}
-              onChange={(hospitalName) => updateCampus({ hospitalName })}
-            />
+            <Field label="Hospital name">
+              <input
+                className={input}
+                value={draft.hospitalName}
+                onChange={(e) =>
+                  setDraft((d) => ({ ...d, hospitalName: e.target.value }))
+                }
+                autoFocus
+              />
+            </Field>
           )}
           {step === 2 && floor && (
             <UnitsStep
               floor={floor}
               onChange={(units) =>
-                updateCampus({
-                  floors: draft.floors.map((f) =>
+                setDraft((d) => ({
+                  ...d,
+                  floors: d.floors.map((f) =>
                     f.id === floor.id ? { ...f, units } : f,
                   ),
-                })
+                }))
               }
             />
           )}
           {step === 3 && (
             <TeamStep
               roster={draft.staffRoster}
-              onChange={(staffRoster) => updateCampus({ staffRoster })}
+              onChange={(staffRoster) =>
+                setDraft((d) => ({ ...d, staffRoster }))
+              }
             />
           )}
-          {error && (
-            <p className="mt-4 text-sm text-red">{error}</p>
-          )}
+          {error && <p className="mt-4 text-sm text-red">{error}</p>}
         </div>
 
         <div className="mt-6 flex justify-between">
           <button
             type="button"
-            disabled={step === 0}
+            disabled={step === 0 || busy}
             onClick={() => {
               setError("");
               setStep((s) => s - 1);
@@ -188,10 +203,15 @@ export function OnboardingWizard({ onComplete, initial }: Props) {
           </button>
           <button
             type="button"
-            onClick={next}
-            className="rounded-lg bg-red px-5 py-2.5 text-sm font-semibold text-white"
+            disabled={busy}
+            onClick={() => void next()}
+            className="rounded-lg bg-red px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
           >
-            {step === STEPS.length - 1 ? "Open board" : "Continue"}
+            {busy
+              ? "Saving…"
+              : step === STEPS.length - 1
+                ? "Open board"
+                : "Continue"}
           </button>
         </div>
       </main>
@@ -199,75 +219,12 @@ export function OnboardingWizard({ onComplete, initial }: Props) {
   );
 }
 
-const input =
-  "w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-red focus:bg-white";
-
-function Field({
-  label,
-  children,
-}: {
-  label: string;
-  children: ReactNode;
-}) {
+function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
     <label className="block">
       <span className="text-sm font-medium text-slate-800">{label}</span>
       <div className="mt-2">{children}</div>
     </label>
-  );
-}
-
-function WelcomeStep({
-  contactName,
-  contactRole,
-  onChange,
-}: {
-  contactName: string;
-  contactRole: string;
-  onChange: (p: { contactName?: string; contactRole?: string }) => void;
-}) {
-  return (
-    <div className="space-y-4">
-      <p className="text-sm text-slate-600">
-        No maps or floor plans to draw — we use ready-made oncology layouts.
-      </p>
-      <Field label="Your name">
-        <input
-          className={input}
-          value={contactName}
-          onChange={(e) => onChange({ contactName: e.target.value })}
-          autoFocus
-        />
-      </Field>
-      <Field label="Your role">
-        <input
-          className={input}
-          value={contactRole}
-          onChange={(e) => onChange({ contactRole: e.target.value })}
-          placeholder="Charge nurse"
-        />
-      </Field>
-    </div>
-  );
-}
-
-function HospitalStep({
-  value,
-  onChange,
-}: {
-  value: string;
-  onChange: (v: string) => void;
-}) {
-  return (
-    <Field label="Hospital name">
-      <input
-        className={input}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder="City Care Hospital"
-        autoFocus
-      />
-    </Field>
   );
 }
 
@@ -280,9 +237,6 @@ function UnitsStep({
 }) {
   return (
     <div className="space-y-3">
-      <p className="text-sm text-slate-600">
-        Toggle units for today and name them how your team speaks.
-      </p>
       {ONCOLOGY_UNIT_KINDS.map((kind) => {
         const unit = floor.units.find((u) => u.unitKind === kind.id);
         const on = Boolean(unit);
@@ -299,7 +253,11 @@ function UnitsStep({
                   if (e.target.checked) {
                     onChange([
                       ...floor.units,
-                      defaultUnitForFloor(floor.id, kind.id, floor.units.length + 1),
+                      defaultUnitForFloor(
+                        floor.id,
+                        kind.id,
+                        floor.units.length + 1,
+                      ),
                     ]);
                   } else if (unit) {
                     onChange(floor.units.filter((u) => u.id !== unit.id));
@@ -318,7 +276,9 @@ function UnitsStep({
                 onChange={(e) =>
                   onChange(
                     floor.units.map((u) =>
-                      u.id === unit.id ? { ...u, wardName: e.target.value } : u,
+                      u.id === unit.id
+                        ? { ...u, wardName: e.target.value }
+                        : u,
                     ),
                   )
                 }
@@ -340,9 +300,6 @@ function TeamStep({
 }) {
   return (
     <div className="space-y-3">
-      <p className="text-sm text-slate-600">
-        Staff sign in on the board with PIN <strong>0000</strong> (pilot).
-      </p>
       {roster.map((p, i) => (
         <div key={p.id} className="grid gap-2 sm:grid-cols-2">
           <input

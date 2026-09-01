@@ -2,8 +2,10 @@ import {
   TRAINING_STORAGE_KEY,
   type TrainingEvent,
 } from "./training";
-import { LAYOUT_STORAGE_KEY, OPS_STORAGE_KEY } from "./layout";
 import type { LayoutConfig } from "./types";
+
+const LAYOUT_STORAGE_KEY = "doqto.ward.layout.v2";
+const OPS_STORAGE_KEY = "doqto.ward.ops.v1";
 
 /** Realistic pilot day for admin benchmarks — internal sample only. */
 export function buildSeedEvents(): TrainingEvent[] {

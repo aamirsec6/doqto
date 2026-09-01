@@ -1,9 +1,3 @@
-import {
-  getActiveUnit,
-  loadCampus,
-  saveCampus,
-  unitToLayoutConfig,
-} from "./campus";
 import { layoutGeometry } from "@/lib/map/geometry";
 import { defaultZonesForOpd } from "@/lib/map/opd-template";
 import { roomCenter } from "./status";
@@ -20,13 +14,6 @@ import type {
   WardSnapshot,
   ZoneKind,
 } from "./types";
-
-export const LAYOUT_STORAGE_KEY = "doqto.ward.layout.v2";
-export const OPS_STORAGE_KEY = "doqto.ward.ops.v1";
-
-export function opsStorageKey(layoutId?: string) {
-  return layoutId ? `${OPS_STORAGE_KEY}.${layoutId}` : OPS_STORAGE_KEY;
-}
 
 export { layoutGeometry } from "@/lib/map/geometry";
 
@@ -65,25 +52,6 @@ export const defaultZonesForStyle = (
   ];
 };
 
-export const emptyLayoutDraft = (): Omit<LayoutConfig, "createdAt"> => ({
-  version: 2,
-  hospitalName: "",
-  contactName: "",
-  contactRole: "",
-  wardName: "",
-  wardType: "ward",
-  floorLabel: "",
-  layoutStyle: "bays",
-  zones: defaultZonesForStyle("bays"),
-  trackAssets: true,
-  staffRoster: [
-    { id: "roster-1", name: "", role: "Charge nurse" },
-    { id: "roster-2", name: "", role: "Staff nurse" },
-    { id: "roster-3", name: "", role: "Doctor" },
-  ],
-  calibration: undefined,
-});
-
 export function layoutFingerprint(config: LayoutConfig): string {
   return JSON.stringify({
     ward: config.wardName,
@@ -100,81 +68,6 @@ export function layoutFingerprint(config: LayoutConfig): string {
     trackAssets: config.trackAssets,
     roster: config.staffRoster.map((s) => [s.id, s.name, s.role]),
   });
-}
-
-export function loadLayout(): LayoutConfig | null {
-  if (typeof window === "undefined") return null;
-  const campus = loadCampus();
-  if (campus) {
-    const active = getActiveUnit(campus);
-    if (!active) return null;
-    return unitToLayoutConfig(campus, active.floor, active.unit);
-  }
-  try {
-    const raw =
-      window.localStorage.getItem(LAYOUT_STORAGE_KEY) ??
-      window.localStorage.getItem("doqto.ward.layout.v1");
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as LayoutConfig;
-    if (!parsed?.zones?.length) return null;
-    if (parsed.version !== 1 && parsed.version !== 2) return null;
-    if (!parsed.staffRoster) {
-      parsed.staffRoster = [
-        {
-          id: "roster-contact",
-          name: parsed.contactName,
-          role: parsed.contactRole || "Charge nurse",
-        },
-      ];
-    }
-    return { ...parsed, version: 2 };
-  } catch {
-    return null;
-  }
-}
-
-export function saveLayout(config: LayoutConfig) {
-  if (config.version === 3 && config.layoutId && config.floorId) {
-    const campus = loadCampus();
-    if (campus) {
-      const floors = campus.floors.map((floor) =>
-        floor.id === config.floorId
-          ? {
-              ...floor,
-              units: floor.units.map((unit) =>
-                unit.id === config.layoutId
-                  ? {
-                      ...unit,
-                      wardName: config.wardName,
-                      wardType: config.wardType,
-                      layoutStyle: config.layoutStyle,
-                      zones: config.zones,
-                      trackAssets: config.trackAssets,
-                      calibration: config.calibration,
-                    }
-                  : unit,
-              ),
-            }
-          : floor,
-      );
-      saveCampus({
-        ...campus,
-        hospitalName: config.hospitalName,
-        contactName: config.contactName,
-        contactRole: config.contactRole,
-        staffRoster: config.staffRoster,
-        floors,
-      });
-      return;
-    }
-  }
-  window.localStorage.setItem(LAYOUT_STORAGE_KEY, JSON.stringify(config));
-}
-
-export function clearLayout() {
-  window.localStorage.removeItem(LAYOUT_STORAGE_KEY);
-  window.localStorage.removeItem("doqto.ward.layout.v1");
-  window.localStorage.removeItem(OPS_STORAGE_KEY);
 }
 
 function bedPositions(
@@ -201,7 +94,7 @@ function offset(point: Point | undefined, dx: number, dy: number): Point {
   };
 }
 
-/** Fresh real ward: empty beds, roster staff on floor, no fake incidents. */
+/** Fresh ward snapshot from layout config — used server-side to seed boards. */
 export function buildWardFromLayout(config: LayoutConfig): WardSnapshot {
   const { rooms, centers } = layoutGeometry(config.zones, config.calibration);
   const fingerprint = layoutFingerprint(config);
@@ -327,24 +220,11 @@ export function buildWardFromLayout(config: LayoutConfig): WardSnapshot {
     beds,
     staff,
     assets,
-    alerts: [
-      {
-        id: `al-open-${Date.now()}`,
-        severity: "info",
-        kind: "clinical",
-        title: "Ward board opened",
-        detail: "Live data mode — update beds, staff, and raise alerts from this screen.",
-        roomId: nursingId,
-        raisedAt: now,
-        lifecycle: "resolved",
-        acknowledged: true,
-      },
-    ],
+    alerts: [],
     metrics,
   };
 }
 
-/** Rebuild room geometry from layout; keep live status where IDs still match. */
 export function mergeWardWithLayout(
   config: LayoutConfig,
   previous: WardSnapshot | null,
@@ -417,33 +297,6 @@ export function mergeWardWithLayout(
   };
 }
 
-export function mapViewBox(rooms: Room[]): {
-  minX: number;
-  minY: number;
-  width: number;
-  height: number;
-  attr: string;
-} {
-  let maxX = 640;
-  let maxY = 360;
-  for (const room of rooms) {
-    const nums = room.path.match(/-?\d+(\.\d+)?/g)?.map(Number) ?? [];
-    for (let i = 0; i < nums.length; i += 1) {
-      if (i % 2 === 0) maxX = Math.max(maxX, nums[i]! + 28);
-      else maxY = Math.max(maxY, nums[i]! + 28);
-    }
-  }
-  const width = Math.ceil(maxX);
-  const height = Math.ceil(maxY);
-  return {
-    minX: 0,
-    minY: 0,
-    width,
-    height,
-    attr: `0 0 ${width} ${height}`,
-  };
-}
-
 export function wardSummary(ward: WardSnapshot) {
   const bedsAvailable = ward.beds.filter((b) => b.status === "available").length;
   const bedsOccupied = ward.beds.filter((b) => b.status === "occupied").length;
@@ -452,7 +305,6 @@ export function wardSummary(ward: WardSnapshot) {
     (s) => s.status === "responding",
   ).length;
   const openAlerts = ward.alerts.filter((a) => !a.acknowledged).length;
-  const assetsMissing = ward.assets.filter((a) => a.status === "missing").length;
 
   return {
     bedsAvailable,
@@ -462,14 +314,8 @@ export function wardSummary(ward: WardSnapshot) {
     staffResponding,
     staffOnFloor: ward.staff.filter((s) => s.status !== "off-floor").length,
     openAlerts,
-    assetsMissing,
+    assetsMissing: ward.assets.filter((a) => a.status === "missing").length,
   };
-}
-
-export function alertAgeMin(raisedAt: string, now = Date.now()): number {
-  const t = Date.parse(raisedAt);
-  if (Number.isNaN(t)) return 0;
-  return Math.max(0, Math.floor((now - t) / 60000));
 }
 
 export const BED_STATUSES: BedStatus[] = [
