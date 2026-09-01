@@ -192,24 +192,17 @@ export class LayoutRepository {
       mapVersion: data.mapVersion ?? 2,
     };
 
-    if (layoutId) {
-      return this.db.wardLayout.upsert({
-        where: { id: layoutId },
-        create: {
-          id: layoutId,
-          tenantId,
-          floorId,
-          ...payload,
-        },
-        update: payload,
-      });
-    }
-    return this.db.wardLayout.create({
-      data: {
+    return this.db.wardLayout.upsert({
+      where: {
+        floorId_wardName: { floorId, wardName: data.wardName },
+      },
+      create: {
+        ...(layoutId ? { id: layoutId } : {}),
         tenantId,
         floorId,
         ...payload,
       },
+      update: payload,
     });
   }
 
