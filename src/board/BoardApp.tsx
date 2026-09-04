@@ -1,45 +1,48 @@
 "use client";
 
-import { OnboardingFlow } from "@/board/components/OnboardingFlow";
+import { BoardProvider, useBoard } from "@/board/context/BoardProvider";
 import { BoardShell } from "@/board/components/BoardShell";
-import { useTenantSnapshot } from "@/board/hooks/useTenantSnapshot";
+import { OnboardingFlow } from "@/board/components/OnboardingFlow";
 
-export function BoardApp() {
-  const {
-    snapshot,
-    activeLayoutId,
-    setActiveLayoutId,
-    loading,
-    error,
-    reload,
-  } = useTenantSnapshot();
+function BoardRouter() {
+  const { snapshot, loading, error, reload } = useBoard();
 
-  if (loading) {
+  if (loading && !snapshot) {
     return (
-      <div className="flex min-h-dvh items-center justify-center bg-[#f4f6f9]">
-        <p className="text-sm text-slate-500">Loading…</p>
+      <div className="board-shell flex min-h-dvh items-center justify-center">
+        <p className="text-sm text-[var(--board-muted)]">Loading hospital…</p>
       </div>
     );
   }
 
-  if (error) {
+  if (error && !snapshot?.layouts.length) {
     return (
-      <div className="flex min-h-dvh items-center justify-center bg-[#f4f6f9]">
-        <p className="text-sm text-red">{error}</p>
+      <div className="board-shell flex min-h-dvh items-center justify-center px-4">
+        <div className="board-card max-w-sm p-6 text-center">
+          <p className="text-sm text-red">{error}</p>
+          <button
+            type="button"
+            onClick={() => void reload()}
+            className="mt-4 rounded-lg bg-red px-4 py-2 text-sm font-semibold text-white"
+          >
+            Retry
+          </button>
+        </div>
       </div>
     );
   }
 
-  if (!snapshot?.layouts.length || !activeLayoutId) {
+  if (!snapshot?.layouts.length) {
     return <OnboardingFlow onComplete={() => void reload()} />;
   }
 
+  return <BoardShell />;
+}
+
+export function BoardApp() {
   return (
-    <BoardShell
-      hospitalName={snapshot.tenant?.name ?? "Oncology"}
-      layouts={snapshot.layouts}
-      layoutId={activeLayoutId}
-      onLayoutChange={setActiveLayoutId}
-    />
+    <BoardProvider>
+      <BoardRouter />
+    </BoardProvider>
   );
 }

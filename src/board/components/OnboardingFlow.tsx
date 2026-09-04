@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
+import { boardApi, BoardApiError } from "@/board/api/client";
 import {
   campusToApiPayload,
   defaultUnitForFloor,
@@ -80,19 +81,16 @@ export function OnboardingFlow({ onComplete }: Props) {
           units: f.units.filter((u) => u.wardName.trim()),
         })),
       });
-      const res = await fetch("/api/tenant/snapshot", {
-        method: "PUT",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ campus: campusToApiPayload(campus) }),
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || "Could not save setup");
-      }
+      await boardApi.saveCampus({ campus: campusToApiPayload(campus) });
       onComplete();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Save failed");
+      setError(
+        e instanceof BoardApiError
+          ? e.message
+          : e instanceof Error
+            ? e.message
+            : "Save failed",
+      );
     } finally {
       setBusy(false);
     }
@@ -243,7 +241,7 @@ function UnitsStep({
         return (
           <div
             key={kind.id}
-            className={`rounded-xl border p-3 ${on ? "border-red/30 bg-red/5" : "border-slate-200"}`}
+            className={`board-card p-3 ${on ? "border-red/30 bg-red/5" : ""}`}
           >
             <label className="flex cursor-pointer items-center gap-3">
               <input

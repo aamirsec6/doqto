@@ -40,5 +40,9 @@ export function jsonError(err: unknown) {
     return Response.json({ error: err.message }, { status: err.status });
   }
   console.error(err);
-  return Response.json({ error: "Internal server error" }, { status: 500 });
+  const message =
+    err instanceof Error && process.env.NODE_ENV !== "production"
+      ? err.message
+      : "Internal server error";
+  return Response.json({ error: message }, { status: 500 });
 }

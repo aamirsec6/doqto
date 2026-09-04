@@ -188,3 +188,50 @@ body {
 .ops-floor-stage {
   background: #eef2f7;
 }
+
+/* Board v2 — see DESIGN.md */
+.board-shell {
+  --board-bg: #f4f6f9;
+  --board-surface: #ffffff;
+  --board-border: #e2e8f0;
+  --board-text: #0f172a;
+  --board-muted: #64748b;
+  background: var(--board-bg);
+  color: var(--board-text);
+}
+
+.board-card {
+  background: var(--board-surface);
+  border: 1px solid var(--board-border);
+  border-radius: 12px;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+.board-kpi {
+  background: var(--board-surface);
+  border: 1px solid var(--board-border);
+  border-radius: 10px;
+  padding: 12px 14px;
+}
+
+.board-kpi-label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--board-muted);
+}
+
+.board-kpi-value {
+  margin-top: 4px;
+  font-family: var(--font-display), system-ui, sans-serif;
+  font-size: 1.5rem;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.board-kpi-hint {
+  margin-top: 2px;
+  font-size: 10px;
+  color: var(--board-muted);
+}

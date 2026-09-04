@@ -11,7 +11,7 @@ interface Props {
 
 export function StaffList({ ward, onUpdate }: Props) {
   return (
-    <div className="rounded-xl border border-slate-200 bg-white">
+    <div className="board-card overflow-hidden">
       <div className="border-b border-slate-100 px-4 py-3">
         <h2 className="text-sm font-semibold text-slate-900">Staff</h2>
         <p className="text-xs text-slate-500">{ward.staff.length} on board</p>
